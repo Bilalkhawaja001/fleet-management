@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from datetime import date, timedelta
+
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
 
 from ...extensions import db
@@ -16,8 +18,54 @@ def _vehicle_choices(form: VehicleDocumentForm):
 @bp.get("/")
 @login_required
 def doc_list():
-    docs = VehicleDocument.query.order_by(VehicleDocument.id.desc()).all()
-    return render_template("documents/doc_list.html", docs=docs)
+    mode = (request.args.get("mode") or "").strip()  # expiring|expired|missing|all
+    today = date.today()
+    exp_window_end = today + timedelta(days=30)
+
+    if mode == "missing":
+        vehicles = Vehicle.query.order_by(Vehicle.plate_no).all()
+        mandatory = [t for t in VehicleDocType]
+        missing_rows = []
+        for v in vehicles:
+            active_types = {
+                d.doc_type
+                for d in (v.documents or [])
+                if d.status == VehicleDocStatus.ACTIVE
+            }
+            missing = [t.value for t in mandatory if t not in active_types]
+            if missing:
+                missing_rows.append({"vehicle": v, "missing": missing})
+        return render_template(
+            "documents/doc_list.html",
+            docs=[],
+            mode=mode,
+            today=today,
+            exp_window_end=exp_window_end,
+            missing_rows=missing_rows,
+        )
+
+    q = VehicleDocument.query
+    if mode == "expiring":
+        q = q.filter(
+            VehicleDocument.status == VehicleDocStatus.ACTIVE,
+            VehicleDocument.expiry_date >= today,
+            VehicleDocument.expiry_date <= exp_window_end,
+        )
+    elif mode == "expired":
+        q = q.filter(
+            VehicleDocument.status == VehicleDocStatus.ACTIVE,
+            VehicleDocument.expiry_date < today,
+        )
+
+    docs = q.order_by(VehicleDocument.expiry_date.asc(), VehicleDocument.id.desc()).all()
+    return render_template(
+        "documents/doc_list.html",
+        docs=docs,
+        mode=mode or "all",
+        today=today,
+        exp_window_end=exp_window_end,
+        missing_rows=[],
+    )
 
 
 @bp.route("/new", methods=["GET", "POST"])

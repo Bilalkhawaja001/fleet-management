@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
 
 from ...extensions import db
@@ -45,8 +45,16 @@ def schedule_create():
 @bp.get("/work-orders")
 @login_required
 def wo_list():
-    work_orders = WorkOrder.query.order_by(WorkOrder.id.desc()).all()
-    return render_template("maintenance/wo_list.html", work_orders=work_orders)
+    q = WorkOrder.query
+    status = (request.args.get("status") or "").strip()
+    if status:
+        try:
+            q = q.filter(WorkOrder.status == WorkOrderStatus(status))
+        except Exception:
+            pass
+
+    work_orders = q.order_by(WorkOrder.id.desc()).all()
+    return render_template("maintenance/wo_list.html", work_orders=work_orders, filter_status=status)
 
 
 @bp.route("/work-orders/new", methods=["GET", "POST"])

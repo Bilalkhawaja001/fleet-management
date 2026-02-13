@@ -1,8 +1,17 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Fuel Entries</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('fuel.fuel_create') }}">New</a>
+  <div>
+    <h3 class="mb-0">Fuel Entries</h3>
+    {% if filter_status %}<div class="text-muted" style="font-size: 0.9rem;">Filter: status={{ filter_status }}</div>{% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="/fuel/">All</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/fuel/?status=pending">Pending</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/fuel/?status=verified">Verified</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/fuel/?status=rejected">Rejected</a>
+    <a class="btn btn-sm btn-success" href="{{ url_for('fuel.fuel_create') }}">New</a>
+  </div>
 </div>
 <p class="text-muted">Entries are append-only (no edit/delete). Verification will be added next.</p>
 <table class="table table-striped">

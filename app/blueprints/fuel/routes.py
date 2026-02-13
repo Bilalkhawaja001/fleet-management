@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
 
 from ...extensions import db
@@ -25,8 +25,16 @@ def _choices(form: FuelEntryForm):
 @bp.get("/")
 @login_required
 def fuel_list():
-    entries = FuelEntry.query.order_by(FuelEntry.id.desc()).all()
-    return render_template("fuel/fuel_list.html", entries=entries)
+    q = FuelEntry.query
+    status = (request.args.get("status") or "").strip()
+    if status:
+        try:
+            q = q.filter(FuelEntry.status == FuelEntryStatus(status))
+        except Exception:
+            pass
+
+    entries = q.order_by(FuelEntry.id.desc()).all()
+    return render_template("fuel/fuel_list.html", entries=entries, filter_status=status)
 
 
 @bp.route("/new", methods=["GET", "POST"])

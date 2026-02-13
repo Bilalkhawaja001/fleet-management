@@ -19,7 +19,7 @@
           in_transit {{ trips_today_by_status.get('in_transit', 0) }} ·
           completed {{ trips_today_by_status.get('completed', 0) }}
         </div>
-        <a class="stretched-link" href="/trips/"></a>
+        <a class="stretched-link" href="/trips/?date={{ today.isoformat() }}"></a>
       </div>
     </div>
   </div>
@@ -30,7 +30,7 @@
         <div class="text-muted">Work Orders (Open)</div>
         <div class="fs-3 fw-bold">{{ open_work_orders }}</div>
         <div style="font-size: 0.85rem;" class="text-muted">Vehicles under maintenance: {{ vehicles_under_maintenance }}</div>
-        <a class="stretched-link" href="/maintenance/work-orders"></a>
+        <a class="stretched-link" href="/maintenance/work-orders?status=open"></a>
       </div>
     </div>
   </div>
@@ -40,7 +40,7 @@
       <div class="card-body">
         <div class="text-muted">Fuel Pending Verification</div>
         <div class="fs-3 fw-bold">{{ fuel_pending }}</div>
-        <a class="stretched-link" href="/fuel/"></a>
+        <a class="stretched-link" href="/fuel/?status=pending"></a>
       </div>
     </div>
   </div>
@@ -50,11 +50,11 @@
       <div class="card-body">
         <div class="text-muted">Documents</div>
         <div style="font-size: 0.95rem;">
-          <div>Expiring (0–30): <span class="fw-bold">{{ docs_expiring }}</span></div>
-          <div>Expired: <span class="fw-bold text-danger">{{ docs_expired }}</span></div>
-          <div>Missing (vehicles): <span class="fw-bold text-warning">{{ missing_docs_vehicles }}</span></div>
+          <div>Expiring (0–30): <span class="fw-bold">{{ docs_expiring }}</span> <a href="/documents/?mode=expiring" class="ms-1">open</a></div>
+          <div>Expired: <span class="fw-bold text-danger">{{ docs_expired }}</span> <a href="/documents/?mode=expired" class="ms-1">open</a></div>
+          <div>Missing (vehicles): <span class="fw-bold text-warning">{{ missing_docs_vehicles }}</span> <a href="/documents/?mode=missing" class="ms-1">open</a></div>
         </div>
-        <a class="stretched-link" href="/documents/"></a>
+        <a class="stretched-link" href="/documents/?mode=expiring"></a>
       </div>
     </div>
   </div>
@@ -81,7 +81,7 @@
       <div class="card-body">
         <div class="text-muted">Incidents (Open)</div>
         <div class="fs-3 fw-bold">{{ incidents_open }}</div>
-        <a class="stretched-link" href="/incidents/"></a>
+        <a class="stretched-link" href="/incidents/?open=1"></a>
       </div>
     </div>
   </div>
@@ -92,7 +92,7 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <div class="fw-semibold">Trips Today (latest)</div>
-        <a class="btn btn-sm btn-outline-secondary" href="/trips/">View all</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ today.isoformat() }}">View all</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -127,7 +127,7 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <div class="fw-semibold">Work Orders (Open)</div>
-        <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders">View all</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders?status=open">View all</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -161,7 +161,7 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <div class="fw-semibold">Documents (Expiring / Expired)</div>
-        <a class="btn btn-sm btn-outline-secondary" href="/documents/">View all</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=expiring">View all</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
@@ -200,7 +200,7 @@
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <div class="fw-semibold">Fuel Pending Verification (latest)</div>
-        <a class="btn btn-sm btn-outline-secondary" href="/fuel/">View all</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/fuel/?status=pending">View all</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">

@@ -1,27 +1,66 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Vehicle Documents</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('documents.doc_create') }}">New</a>
+  <div>
+    <h3 class="mb-0">Vehicle Documents</h3>
+    <div class="text-muted" style="font-size: 0.9rem;">View: {{ mode }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=all">All</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=expiring">Expiring (0–30)</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=expired">Expired</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=missing">Missing</a>
+    <a class="btn btn-sm btn-success" href="{{ url_for('documents.doc_create') }}">New</a>
+  </div>
 </div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Vehicle</th><th>Type</th><th>Number</th><th>Issue</th><th>Expiry</th><th>Status</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for d in docs %}
+
+{% if mode == 'missing' %}
+  <table class="table table-striped">
+    <thead>
       <tr>
-        <td>{{ d.id }}</td>
-        <td>{{ d.vehicle.plate_no }}</td>
-        <td>{{ d.doc_type.value }}</td>
-        <td>{{ d.doc_number or '' }}</td>
-        <td>{{ d.issue_date or '' }}</td>
-        <td>{{ d.expiry_date }}</td>
-        <td>{{ d.status.value }}</td>
+        <th>Vehicle</th><th>Missing Doc Types</th>
       </tr>
-    {% endfor %}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {% for r in missing_rows %}
+        <tr>
+          <td>{{ r.vehicle.plate_no }}</td>
+          <td>{{ r.missing | join(', ') }}</td>
+        </tr>
+      {% endfor %}
+      {% if not missing_rows %}
+        <tr><td colspan="2" class="text-muted p-3">No missing documents.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+{% else %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>ID</th><th>Vehicle</th><th>Type</th><th>Number</th><th>Issue</th><th>Expiry</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in docs %}
+        <tr>
+          <td>{{ d.id }}</td>
+          <td>{{ d.vehicle.plate_no }}</td>
+          <td>{{ d.doc_type.value }}</td>
+          <td>{{ d.doc_number or '' }}</td>
+          <td>{{ d.issue_date or '' }}</td>
+          <td>
+            {{ d.expiry_date }}
+            {% if today and d.expiry_date < today %}
+              <span class="badge text-bg-danger">expired</span>
+            {% endif %}
+          </td>
+          <td>{{ d.status.value }}</td>
+        </tr>
+      {% endfor %}
+      {% if not docs %}
+        <tr><td colspan="7" class="text-muted p-3">No documents found.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+{% endif %}
 {% endblock %}

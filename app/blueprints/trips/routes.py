@@ -1,4 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from datetime import datetime, date, time
+
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
 
 from ...extensions import db
@@ -21,8 +23,33 @@ def _fill_choices(form: TripForm):
 @bp.get("/")
 @login_required
 def trip_list():
-    trips = Trip.query.order_by(Trip.id.desc()).all()
-    return render_template("trips/trips_list.html", trips=trips)
+    q = Trip.query
+
+    # Filters
+    status = (request.args.get("status") or "").strip()
+    if status:
+        try:
+            q = q.filter(Trip.status == TripStatus(status))
+        except Exception:
+            pass
+
+    day = (request.args.get("date") or "").strip()  # YYYY-MM-DD
+    if day:
+        try:
+            d = date.fromisoformat(day)
+            start_dt = datetime.combine(d, time.min)
+            end_dt = datetime.combine(d, time.max)
+            q = q.filter(Trip.time_out >= start_dt, Trip.time_out <= end_dt)
+        except Exception:
+            pass
+
+    trips = q.order_by(Trip.id.desc()).all()
+    return render_template(
+        "trips/trips_list.html",
+        trips=trips,
+        filter_status=status,
+        filter_date=day,
+    )
 
 
 @bp.route("/new", methods=["GET", "POST"])

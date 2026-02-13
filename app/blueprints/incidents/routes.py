@@ -32,8 +32,13 @@ def _choices(form: IncidentForm):
 @bp.get("/")
 @login_required
 def incident_list():
-    rows = Incident.query.order_by(Incident.id.desc()).all()
-    return render_template("incidents/incident_list.html", rows=rows)
+    q = Incident.query
+    open_only = (request.args.get("open") or "").strip()
+    if open_only in {"1", "true", "yes"}:
+        q = q.filter(Incident.status != IncidentStatus.CLOSED)
+
+    rows = q.order_by(Incident.id.desc()).all()
+    return render_template("incidents/incident_list.html", rows=rows, filter_open=open_only)
 
 
 @bp.route("/new", methods=["GET", "POST"])

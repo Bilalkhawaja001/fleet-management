@@ -1,8 +1,21 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Trips</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('trips.trip_create') }}">New</a>
+  <div>
+    <h3 class="mb-0">Trips</h3>
+    <div class="text-muted" style="font-size: 0.9rem;">
+      {% if filter_date %}date={{ filter_date }}{% endif %}
+      {% if filter_status %} {% if filter_date %}·{% endif %} status={{ filter_status }}{% endif %}
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="/trips/">All</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ (filter_date or '') }}&status=planned">Planned</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ (filter_date or '') }}&status=assigned">Assigned</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ (filter_date or '') }}&status=in_transit">In Transit</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ (filter_date or '') }}&status=completed">Completed</a>
+    <a class="btn btn-sm btn-success" href="{{ url_for('trips.trip_create') }}">New</a>
+  </div>
 </div>
 <table class="table table-striped">
   <thead>
