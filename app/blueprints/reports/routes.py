@@ -5,7 +5,7 @@ from datetime import datetime, date, time
 from flask import Blueprint, render_template, Response, send_file, request
 from flask_login import login_required
 
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
 
 from ...models import Trip, FuelEntry, WorkOrder, Vehicle, Driver, PreventiveSchedule
@@ -70,10 +70,12 @@ def _csv_response(filename: str, rows, header):
     )
 
 
-def _pdf_simple_table(filename: str, title: str, header, rows, subtitle: str | None = None):
+def _pdf_simple_table(filename: str, title: str, header, rows, subtitle: str | None = None, *, landscape_mode: bool = True):
     packet = io.BytesIO()
-    c = canvas.Canvas(packet, pagesize=A4)
-    width, height = A4
+
+    page_size = landscape(A4) if landscape_mode else A4
+    c = canvas.Canvas(packet, pagesize=page_size)
+    width, height = page_size
 
     y = height - 50
     c.setFont("Helvetica-Bold", 14)
@@ -150,6 +152,10 @@ def trips_csv():
                 t.origin or "",
                 t.destination_city or "",
                 t.destination or "",
+                t.odometer_start or "",
+                t.odometer_end or "",
+                t.time_out.strftime("%Y-%m-%d %H:%M") if t.time_out else "",
+                t.time_in.strftime("%Y-%m-%d %H:%M") if t.time_in else "",
                 t.distance_km or "",
                 f"{t.fuel_liters:.2f}" if t.fuel_liters else "",
                 f"{t.fuel_amount:.2f}" if t.fuel_amount else "",
@@ -171,6 +177,10 @@ def trips_csv():
             "origin",
             "destination_city",
             "destination",
+            "odometer_start",
+            "odometer_end",
+            "time_out",
+            "time_in",
             "distance_km",
             "fuel_liters",
             "fuel_amount",
@@ -203,20 +213,48 @@ def trips_pdf():
             [
                 t.id,
                 t.status.value,
+                t.usage_type.value if t.usage_type else "",
                 t.vehicle.plate_no if t.vehicle else "",
                 t.driver.name if t.driver else "",
-                (t.origin or "") + "->" + (t.destination or ""),
+                t.odometer_start or "",
+                t.odometer_end or "",
+                t.time_out.strftime("%Y-%m-%d %H:%M") if t.time_out else "",
+                t.time_in.strftime("%Y-%m-%d %H:%M") if t.time_in else "",
                 t.distance_km or "",
+                f"{t.fuel_liters:.2f}" if t.fuel_liters else "",
+                f"{t.fuel_amount:.2f}" if t.fuel_amount else "",
+                f"{t.toll_amount:.2f}" if t.toll_amount else "",
+                f"{t.other_amount:.2f}" if t.other_amount else "",
                 f"{t.total_expenses:.2f}" if t.total_expenses else "",
                 f"{t.fuel_avg_km_per_l:.2f}" if t.fuel_avg_km_per_l else "",
+                (t.origin or "") + "->" + (t.destination or ""),
             ]
         )
     return _pdf_simple_table(
         "trips.pdf",
         "Trips Report",
-        ["id", "status", "vehicle", "driver", "route", "km", "total", "km/L"],
+        [
+            "id",
+            "status",
+            "usage",
+            "vehicle",
+            "driver",
+            "start_odo",
+            "end_odo",
+            "time_out",
+            "time_in",
+            "km",
+            "fuel_l",
+            "fuel_rs",
+            "toll_rs",
+            "other_rs",
+            "total_rs",
+            "km/L",
+            "route",
+        ],
         rows,
         subtitle=_subtitle(form),
+        landscape_mode=True,
     )
 
 
@@ -278,18 +316,22 @@ def fuel_pdf():
             [
                 l.id,
                 l.vehicle.plate_no if l.vehicle else "",
-                str(l.liters),
-                str(l.amount or ""),
+                l.driver.name if l.driver else "",
+                l.trip_id or "",
                 l.fuel_date.isoformat() if l.fuel_date else "",
+                str(l.liters),
+                str(l.rate or ""),
+                str(l.amount or ""),
                 l.status.value,
             ]
         )
     return _pdf_simple_table(
         "fuel_entries.pdf",
         "Fuel Entries Report",
-        ["id", "vehicle", "liters", "amount", "fuel_date", "status"],
+        ["id", "vehicle", "driver", "trip", "fuel_date", "liters", "rate", "amount", "status"],
         rows,
         subtitle=_subtitle(form),
+        landscape_mode=True,
     )
 
 
@@ -353,6 +395,7 @@ def work_orders_pdf():
         ["id", "status", "vehicle", "title"],
         rows,
         subtitle=_subtitle(form),
+        landscape_mode=True,
     )
 
 
@@ -410,4 +453,5 @@ def preventive_schedules_pdf():
         ["id", "vehicle", "title", "km", "days"],
         rows,
         subtitle=_subtitle(form),
+        landscape_mode=True,
     )
