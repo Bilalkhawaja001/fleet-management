@@ -5,6 +5,7 @@ from wtforms.validators import DataRequired, Optional, NumberRange
 
 class FuelLogForm(FlaskForm):
     vehicle_id = SelectField("Vehicle", coerce=int, validators=[DataRequired()])
+    driver_id = SelectField("Driver", coerce=int, validators=[Optional()])
     liters = DecimalField("Liters", validators=[DataRequired(), NumberRange(min=0)])
     amount = DecimalField("Amount", validators=[Optional(), NumberRange(min=0)])
     odometer_km = IntegerField("Odometer (km)", validators=[Optional(), NumberRange(min=0)])

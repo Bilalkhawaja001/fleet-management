@@ -203,6 +203,8 @@ def fuel_csv():
         q = q.filter(FuelLog.filled_at <= end_dt)
     if vehicle_id:
         q = q.filter(FuelLog.vehicle_id == vehicle_id)
+    if driver_id:
+        q = q.filter(FuelLog.driver_id == driver_id)
 
     logs = q.order_by(FuelLog.id.desc()).all()
     rows = []
@@ -235,6 +237,8 @@ def fuel_pdf():
         q = q.filter(FuelLog.filled_at <= end_dt)
     if vehicle_id:
         q = q.filter(FuelLog.vehicle_id == vehicle_id)
+    if driver_id:
+        q = q.filter(FuelLog.driver_id == driver_id)
 
     logs = q.order_by(FuelLog.id.desc()).all()
     rows = []

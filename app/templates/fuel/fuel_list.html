@@ -8,7 +8,7 @@
 <table class="table table-striped">
   <thead>
     <tr>
-      <th>ID</th><th>Vehicle</th><th>Liters</th><th>Amount</th><th>Odometer</th><th>Vendor</th>
+      <th>ID</th><th>Vehicle</th><th>Driver</th><th>Liters</th><th>Amount</th><th>Odometer</th><th>Vendor</th>
     </tr>
   </thead>
   <tbody>
@@ -16,6 +16,7 @@
       <tr>
         <td>{{ l.id }}</td>
         <td>{{ l.vehicle.plate_no }}</td>
+        <td>{{ l.driver.name if l.driver else '' }}</td>
         <td>{{ l.liters }}</td>
         <td>{{ l.amount or '' }}</td>
         <td>{{ l.odometer_km or '' }}</td>

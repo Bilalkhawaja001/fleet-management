@@ -9,6 +9,8 @@ class FuelLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     vehicle_id = db.Column(db.Integer, db.ForeignKey("vehicles.id"), nullable=False, index=True)
+    driver_id = db.Column(db.Integer, db.ForeignKey("drivers.id"), nullable=True, index=True)
+
     filled_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     liters = db.Column(db.Numeric(10, 2), nullable=False)
@@ -21,3 +23,4 @@ class FuelLog(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     vehicle = db.relationship("Vehicle", backref=db.backref("fuel_logs", lazy=True))
+    driver = db.relationship("Driver", backref=db.backref("fuel_logs", lazy=True))
