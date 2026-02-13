@@ -7,8 +7,19 @@ from ..extensions import db
 class WorkOrderStatus(str, enum.Enum):
     OPEN = "open"
     IN_PROGRESS = "in_progress"
-    DONE = "done"
-    CANCELED = "canceled"
+    COMPLETED = "completed"
+    CLOSED = "closed"
+
+
+class WorkOrderType(str, enum.Enum):
+    PREVENTIVE = "preventive"
+    BREAKDOWN = "breakdown"
+    ACCIDENT = "accident"
+
+
+class WorkSource(str, enum.Enum):
+    INTERNAL = "internal"
+    EXTERNAL = "external"
 
 
 class PreventiveSchedule(db.Model):
@@ -34,11 +45,24 @@ class WorkOrder(db.Model):
     __tablename__ = "work_orders"
 
     id = db.Column(db.Integer, primary_key=True)
+    wo_no = db.Column(db.String(80), nullable=True, unique=True, index=True)
+
     vehicle_id = db.Column(db.Integer, db.ForeignKey("vehicles.id"), nullable=False, index=True)
 
-    status = db.Column(db.Enum(WorkOrderStatus), nullable=False, default=WorkOrderStatus.OPEN)
+    wo_type = db.Column(db.Enum(WorkOrderType), nullable=False, default=WorkOrderType.PREVENTIVE, index=True)
+    work_source = db.Column(db.Enum(WorkSource), nullable=False, default=WorkSource.INTERNAL, index=True)
+
+    status = db.Column(db.Enum(WorkOrderStatus), nullable=False, default=WorkOrderStatus.OPEN, index=True)
+
     opened_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    vehicle_in_workshop_at = db.Column(db.DateTime, nullable=True)
+    vehicle_out_workshop_at = db.Column(db.DateTime, nullable=True)
     closed_at = db.Column(db.DateTime, nullable=True)
+
+    odometer_in = db.Column(db.Integer, nullable=True)
+    odometer_out = db.Column(db.Integer, nullable=True)
+
+    vendor_name = db.Column(db.String(160), nullable=True)
 
     title = db.Column(db.String(160), nullable=False)
     description = db.Column(db.Text, nullable=True)
@@ -46,6 +70,13 @@ class WorkOrder(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     vehicle = db.relationship("Vehicle", backref=db.backref("work_orders", lazy=True))
+
+    @property
+    def downtime_minutes(self) -> int | None:
+        if not self.vehicle_in_workshop_at or not self.vehicle_out_workshop_at:
+            return None
+        delta = self.vehicle_out_workshop_at - self.vehicle_in_workshop_at
+        return int(delta.total_seconds() // 60)
 
 
 class Part(db.Model):

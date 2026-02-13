@@ -26,6 +26,7 @@ def driver_create():
             name=form.name.data.strip(),
             phone=(form.phone.data or "").strip() or None,
             license_no=(form.license_no.data or "").strip() or None,
+            license_expiry=form.license_expiry.data,
             status=form.status.data.strip(),
         )
         db.session.add(d)
@@ -49,6 +50,7 @@ def driver_edit(driver_id: int):
         d.name = form.name.data.strip()
         d.phone = (form.phone.data or "").strip() or None
         d.license_no = (form.license_no.data or "").strip() or None
+        d.license_expiry = form.license_expiry.data
         d.status = form.status.data.strip()
         db.session.commit()
         flash("Driver updated", "success")

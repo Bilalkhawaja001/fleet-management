@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Vehicle Documents</h3>
+  <a class="btn btn-sm btn-success" href="{{ url_for('documents.doc_create') }}">New</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th><th>Vehicle</th><th>Type</th><th>Number</th><th>Issue</th><th>Expiry</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for d in docs %}
+      <tr>
+        <td>{{ d.id }}</td>
+        <td>{{ d.vehicle.plate_no }}</td>
+        <td>{{ d.doc_type.value }}</td>
+        <td>{{ d.doc_number or '' }}</td>
+        <td>{{ d.issue_date or '' }}</td>
+        <td>{{ d.expiry_date }}</td>
+        <td>{{ d.status.value }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

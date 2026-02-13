@@ -16,6 +16,10 @@
       {{ form.license_no.label(class_='form-label') }}
       {{ form.license_no(class_='form-control') }}
     </div>
+    <div class="col-md-3 mb-3">
+      {{ form.license_expiry.label(class_='form-label') }}
+      {{ form.license_expiry(class_='form-control', type='date') }}
+    </div>
     <div class="col-md-2 mb-3">
       {{ form.status.label(class_='form-label') }}
       {{ form.status(class_='form-control') }}

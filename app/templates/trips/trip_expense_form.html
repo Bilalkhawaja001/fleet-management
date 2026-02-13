@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3 class="mb-3">New Expense — Trip #{{ trip.id }}</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      {{ form.expense_type.label(class_='form-label') }}
+      {{ form.expense_type(class_='form-select') }}
+    </div>
+    <div class="col-md-4 mb-3">
+      {{ form.expense_date.label(class_='form-label') }}
+      {{ form.expense_date(class_='form-control', type='date') }}
+    </div>
+    <div class="col-md-4 mb-3">
+      {{ form.amount.label(class_='form-label') }}
+      {{ form.amount(class_='form-control') }}
+    </div>
+  </div>
+  <div class="mb-3">
+    {{ form.description.label(class_='form-label') }}
+    {{ form.description(class_='form-control') }}
+  </div>
+  {{ form.submit(class_='btn btn-primary') }}
+  <a class="btn btn-outline-secondary" href="{{ url_for('trips.trip_expenses', trip_id=trip.id) }}">Cancel</a>
+</form>
+{% endblock %}

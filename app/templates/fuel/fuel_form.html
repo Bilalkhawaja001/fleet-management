@@ -4,33 +4,51 @@
 <form method="post">
   {{ form.hidden_tag() }}
   <div class="row">
-    <div class="col-md-6 mb-3">
+    <div class="col-md-4 mb-3">
       {{ form.vehicle_id.label(class_='form-label') }}
       {{ form.vehicle_id(class_='form-select') }}
     </div>
-    <div class="col-md-6 mb-3">
+    <div class="col-md-4 mb-3">
       {{ form.driver_id.label(class_='form-label') }}
       {{ form.driver_id(class_='form-select') }}
     </div>
+    <div class="col-md-4 mb-3">
+      {{ form.trip_id.label(class_='form-label') }}
+      {{ form.trip_id(class_='form-select') }}
+    </div>
   </div>
+
   <div class="row">
+    <div class="col-md-4 mb-3">
+      {{ form.slip_no.label(class_='form-label') }}
+      {{ form.slip_no(class_='form-control') }}
+    </div>
+    <div class="col-md-4 mb-3">
+      {{ form.fuel_date.label(class_='form-label') }}
+      {{ form.fuel_date(class_='form-control', type='date') }}
+    </div>
+    <div class="col-md-4 mb-3">
+      {{ form.fuel_type.label(class_='form-label') }}
+      {{ form.fuel_type(class_='form-select') }}
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-3 mb-3">
+      {{ form.odometer_at_fuel.label(class_='form-label') }}
+      {{ form.odometer_at_fuel(class_='form-control') }}
+    </div>
     <div class="col-md-3 mb-3">
       {{ form.liters.label(class_='form-label') }}
       {{ form.liters(class_='form-control') }}
     </div>
     <div class="col-md-3 mb-3">
+      {{ form.rate.label(class_='form-label') }}
+      {{ form.rate(class_='form-control') }}
+    </div>
+    <div class="col-md-3 mb-3">
       {{ form.amount.label(class_='form-label') }}
       {{ form.amount(class_='form-control') }}
-    </div>
-  </div>
-  <div class="row">
-    <div class="col-md-3 mb-3">
-      {{ form.odometer_km.label(class_='form-label') }}
-      {{ form.odometer_km(class_='form-control') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.vendor.label(class_='form-label') }}
-      {{ form.vendor(class_='form-control') }}
     </div>
   </div>
   <div class="mb-3">

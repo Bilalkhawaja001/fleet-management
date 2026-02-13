@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Incidents</h3>
+  <a class="btn btn-sm btn-success" href="{{ url_for('incidents.incident_create') }}">New</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th><th>No</th><th>Vehicle</th><th>Type</th><th>Severity</th><th>Status</th><th>When</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for i in rows %}
+      <tr>
+        <td>{{ i.id }}</td>
+        <td>{{ i.incident_no }}</td>
+        <td>{{ i.vehicle.plate_no }}</td>
+        <td>{{ i.incident_type.value }}</td>
+        <td>{{ i.severity.value }}</td>
+        <td>{{ i.status.value }}</td>
+        <td>{{ i.incident_dt }}</td>
+        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('incidents.incident_detail', incident_id=i.id) }}">View</a></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

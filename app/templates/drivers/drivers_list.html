@@ -7,7 +7,7 @@
 <table class="table table-striped">
   <thead>
     <tr>
-      <th>ID</th><th>Name</th><th>Phone</th><th>License</th><th>Status</th><th></th>
+      <th>ID</th><th>Name</th><th>Phone</th><th>License</th><th>Expiry</th><th>Status</th><th></th>
     </tr>
   </thead>
   <tbody>
@@ -17,6 +17,7 @@
         <td>{{ d.name }}</td>
         <td>{{ d.phone or '' }}</td>
         <td>{{ d.license_no or '' }}</td>
+        <td>{{ d.license_expiry.isoformat() if d.license_expiry else '' }}</td>
         <td>{{ d.status }}</td>
         <td>
           {% if current_user.role.value in ['super_admin','admin'] %}

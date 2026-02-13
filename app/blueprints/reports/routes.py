@@ -8,7 +8,7 @@ from flask_login import login_required
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from ...models import Trip, FuelLog, WorkOrder, Vehicle, Driver, PreventiveSchedule
+from ...models import Trip, FuelEntry, WorkOrder, Vehicle, Driver, PreventiveSchedule
 from .forms import DateRangeForm
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
@@ -144,16 +144,41 @@ def trips_csv():
             [
                 t.id,
                 t.status.value,
+                t.usage_type.value if t.usage_type else "",
                 t.vehicle.plate_no if t.vehicle else "",
                 t.driver.name if t.driver else "",
                 t.origin or "",
+                t.destination_city or "",
                 t.destination or "",
+                t.distance_km or "",
+                f"{t.fuel_liters:.2f}" if t.fuel_liters else "",
+                f"{t.fuel_amount:.2f}" if t.fuel_amount else "",
+                f"{t.toll_amount:.2f}" if t.toll_amount else "",
+                f"{t.other_amount:.2f}" if t.other_amount else "",
+                f"{t.total_expenses:.2f}" if t.total_expenses else "",
+                f"{t.fuel_avg_km_per_l:.2f}" if t.fuel_avg_km_per_l else "",
             ]
         )
     return _csv_response(
         "trips.csv",
         rows,
-        ["id", "status", "vehicle", "driver", "origin", "destination"],
+        [
+            "id",
+            "status",
+            "usage_type",
+            "vehicle",
+            "driver",
+            "origin",
+            "destination_city",
+            "destination",
+            "distance_km",
+            "fuel_liters",
+            "fuel_amount",
+            "toll_amount",
+            "other_amount",
+            "total_expenses",
+            "fuel_avg_km_per_l",
+        ],
     )
 
 
@@ -181,12 +206,15 @@ def trips_pdf():
                 t.vehicle.plate_no if t.vehicle else "",
                 t.driver.name if t.driver else "",
                 (t.origin or "") + "->" + (t.destination or ""),
+                t.distance_km or "",
+                f"{t.total_expenses:.2f}" if t.total_expenses else "",
+                f"{t.fuel_avg_km_per_l:.2f}" if t.fuel_avg_km_per_l else "",
             ]
         )
     return _pdf_simple_table(
         "trips.pdf",
         "Trips Report",
-        ["id", "status", "vehicle", "driver", "route"],
+        ["id", "status", "vehicle", "driver", "route", "km", "total", "km/L"],
         rows,
         subtitle=_subtitle(form),
     )
@@ -196,33 +224,36 @@ def trips_pdf():
 @login_required
 def fuel_csv():
     form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
-    q = FuelLog.query
+    q = FuelEntry.query
     if start_dt:
-        q = q.filter(FuelLog.filled_at >= start_dt)
+        q = q.filter(FuelEntry.created_at >= start_dt)
     if end_dt:
-        q = q.filter(FuelLog.filled_at <= end_dt)
+        q = q.filter(FuelEntry.created_at <= end_dt)
     if vehicle_id:
-        q = q.filter(FuelLog.vehicle_id == vehicle_id)
+        q = q.filter(FuelEntry.vehicle_id == vehicle_id)
     if driver_id:
-        q = q.filter(FuelLog.driver_id == driver_id)
+        q = q.filter(FuelEntry.driver_id == driver_id)
 
-    logs = q.order_by(FuelLog.id.desc()).all()
+    logs = q.order_by(FuelEntry.id.desc()).all()
     rows = []
     for l in logs:
         rows.append(
             [
                 l.id,
-                l.vehicle.plate_no,
+                l.vehicle.plate_no if l.vehicle else "",
+                l.driver.name if l.driver else "",
+                l.trip_id or "",
+                l.fuel_date.isoformat() if l.fuel_date else "",
                 str(l.liters),
+                str(l.rate or ""),
                 str(l.amount or ""),
-                l.odometer_km or "",
-                l.vendor or "",
+                l.status.value,
             ]
         )
     return _csv_response(
-        "fuel_logs.csv",
+        "fuel_entries.csv",
         rows,
-        ["id", "vehicle", "liters", "amount", "odometer_km", "vendor"],
+        ["id", "vehicle", "driver", "trip_id", "fuel_date", "liters", "rate", "amount", "status"],
     )
 
 
@@ -230,32 +261,33 @@ def fuel_csv():
 @login_required
 def fuel_pdf():
     form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
-    q = FuelLog.query
+    q = FuelEntry.query
     if start_dt:
-        q = q.filter(FuelLog.filled_at >= start_dt)
+        q = q.filter(FuelEntry.created_at >= start_dt)
     if end_dt:
-        q = q.filter(FuelLog.filled_at <= end_dt)
+        q = q.filter(FuelEntry.created_at <= end_dt)
     if vehicle_id:
-        q = q.filter(FuelLog.vehicle_id == vehicle_id)
+        q = q.filter(FuelEntry.vehicle_id == vehicle_id)
     if driver_id:
-        q = q.filter(FuelLog.driver_id == driver_id)
+        q = q.filter(FuelEntry.driver_id == driver_id)
 
-    logs = q.order_by(FuelLog.id.desc()).all()
+    logs = q.order_by(FuelEntry.id.desc()).all()
     rows = []
     for l in logs:
         rows.append(
             [
                 l.id,
-                l.vehicle.plate_no,
+                l.vehicle.plate_no if l.vehicle else "",
                 str(l.liters),
                 str(l.amount or ""),
-                l.odometer_km or "",
+                l.fuel_date.isoformat() if l.fuel_date else "",
+                l.status.value,
             ]
         )
     return _pdf_simple_table(
-        "fuel_logs.pdf",
-        "Fuel Logs Report",
-        ["id", "vehicle", "liters", "amount", "odometer"],
+        "fuel_entries.pdf",
+        "Fuel Entries Report",
+        ["id", "vehicle", "liters", "amount", "fuel_date", "status"],
         rows,
         subtitle=_subtitle(form),
     )

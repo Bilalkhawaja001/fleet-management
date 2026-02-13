@@ -28,6 +28,8 @@ def create_app(config_object=Config):
     from .blueprints.maintenance.routes import bp as maintenance_bp
     from .blueprints.users.routes import bp as users_bp
     from .blueprints.reports.routes import bp as reports_bp
+    from .blueprints.documents.routes import bp as documents_bp
+    from .blueprints.incidents.routes import bp as incidents_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(fleet_bp)
@@ -37,5 +39,7 @@ def create_app(config_object=Config):
     app.register_blueprint(maintenance_bp)
     app.register_blueprint(users_bp)
     app.register_blueprint(reports_bp)
+    app.register_blueprint(documents_bp)
+    app.register_blueprint(incidents_bp)
 
     return app

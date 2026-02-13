@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime
+from datetime import datetime, date
 
 from ..extensions import db
 
@@ -11,6 +11,25 @@ class TripStatus(str, enum.Enum):
     COMPLETED = "completed"
 
 
+class UsageType(str, enum.Enum):
+    OFFICIAL = "official"
+    PERSONAL = "personal"
+    MEDICAL_EMERGENCY = "medical_emergency"
+    SCHOOL = "school"
+    EDUCATIONAL = "educational"
+
+
+class ItemsOwner(str, enum.Enum):
+    PERSONAL = "personal"
+    COMPANY = "company"
+
+
+class ItemsReturnStatus(str, enum.Enum):
+    RETURNED = "returned"
+    NOT_RETURNED = "not_returned"
+    PARTIAL = "partial"
+
+
 class Trip(db.Model):
     __tablename__ = "trips"
 
@@ -19,10 +38,32 @@ class Trip(db.Model):
     vehicle_id = db.Column(db.Integer, db.ForeignKey("vehicles.id"), nullable=True, index=True)
     driver_id = db.Column(db.Integer, db.ForeignKey("drivers.id"), nullable=True, index=True)
 
+    # Trip closure (captured at trip end; can be entered later, but required to close a trip)
+    odometer_start = db.Column(db.Integer, nullable=True)
+    odometer_end = db.Column(db.Integer, nullable=True)
+    time_out = db.Column(db.DateTime, nullable=True)
+    time_in = db.Column(db.DateTime, nullable=True)
+
+    usage_type = db.Column(db.Enum(UsageType), nullable=False, default=UsageType.OFFICIAL)
+    department = db.Column(db.String(120), nullable=True)
+    employee_name = db.Column(db.String(120), nullable=True)
+
     origin = db.Column(db.String(120), nullable=True)
+    destination_city = db.Column(db.String(120), nullable=True)
     destination = db.Column(db.String(120), nullable=True)
 
+    carrying_items = db.Column(db.Boolean, nullable=False, default=False)
+    items_owner = db.Column(db.Enum(ItemsOwner), nullable=True)
+    gatepass_no = db.Column(db.String(80), nullable=True)
+    items_reason = db.Column(db.String(255), nullable=True)
+    items_details = db.Column(db.Text, nullable=True)
+
+    items_return_status = db.Column(db.Enum(ItemsReturnStatus), nullable=True)
+    items_not_returned_reason = db.Column(db.Text, nullable=True)
+    items_expected_return_date = db.Column(db.Date, nullable=True)
+
     status = db.Column(db.Enum(TripStatus), nullable=False, default=TripStatus.PLANNED)
+    # legacy timestamps (kept for backward compatibility; prefer time_out/time_in)
     start_at = db.Column(db.DateTime, nullable=True)
     end_at = db.Column(db.DateTime, nullable=True)
 
@@ -32,6 +73,49 @@ class Trip(db.Model):
 
     vehicle = db.relationship("Vehicle", backref=db.backref("trips", lazy=True))
     driver = db.relationship("Driver", backref=db.backref("trips", lazy=True))
+
+    @property
+    def distance_km(self):
+        if self.odometer_start is None or self.odometer_end is None:
+            return None
+        return max(0, int(self.odometer_end) - int(self.odometer_start))
+
+    @property
+    def toll_amount(self):
+        # Sum of toll expenses
+        if not getattr(self, "expenses", None):
+            return 0
+        return sum([float(e.amount) for e in self.expenses if getattr(e.expense_type, "value", e.expense_type) == "toll"])
+
+    @property
+    def other_amount(self):
+        if not getattr(self, "expenses", None):
+            return 0
+        return sum([float(e.amount) for e in self.expenses if getattr(e.expense_type, "value", e.expense_type) == "other"])
+
+    @property
+    def fuel_liters(self):
+        if not getattr(self, "fuel_entries", None):
+            return 0
+        return sum([float(getattr(f, "liters", 0) or 0) for f in self.fuel_entries])
+
+    @property
+    def fuel_amount(self):
+        if not getattr(self, "fuel_entries", None):
+            return 0
+        return sum([float(getattr(f, "amount", 0) or 0) for f in self.fuel_entries])
+
+    @property
+    def total_expenses(self):
+        return float(self.fuel_amount or 0) + float(self.toll_amount or 0) + float(self.other_amount or 0)
+
+    @property
+    def fuel_avg_km_per_l(self):
+        d = self.distance_km
+        l = self.fuel_liters
+        if not d or not l:
+            return None
+        return float(d) / float(l)
 
     def __repr__(self) -> str:
         return f"<Trip {self.id} {self.status}>"
