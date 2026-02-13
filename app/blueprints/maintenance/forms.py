@@ -24,6 +24,15 @@ class WorkOrderForm(FlaskForm):
     submit = SubmitField("Save")
 
 
+class WorkOrderStatusForm(FlaskForm):
+    status = SelectField(
+        "Status",
+        choices=[(s.value, s.name.replace("_", " ").title()) for s in WorkOrderStatus],
+        validators=[DataRequired()],
+    )
+    submit = SubmitField("Update Status")
+
+
 class PartForm(FlaskForm):
     name = StringField("Part Name", validators=[DataRequired()])
     qty = DecimalField("Qty", validators=[DataRequired(), NumberRange(min=0)])

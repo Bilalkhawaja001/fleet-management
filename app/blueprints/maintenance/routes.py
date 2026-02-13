@@ -4,7 +4,7 @@ from flask_login import login_required
 from ...extensions import db
 from ...models import Vehicle, PreventiveSchedule, WorkOrder, WorkOrderStatus, Part, Role
 from ...rbac import role_required
-from .forms import PreventiveScheduleForm, WorkOrderForm, PartForm
+from .forms import PreventiveScheduleForm, WorkOrderForm, WorkOrderStatusForm, PartForm
 
 bp = Blueprint("maintenance", __name__, url_prefix="/maintenance")
 
@@ -79,17 +79,27 @@ def wo_detail(wo_id: int):
         flash("Work order not found", "warning")
         return redirect(url_for("maintenance.wo_list"))
 
-    form = PartForm()
-    if form.validate_on_submit():
+    part_form = PartForm()
+    status_form = WorkOrderStatusForm(status=wo.status.value)
+
+    # One page, two forms: use submit button name to route
+    if part_form.submit.data and part_form.validate_on_submit():
         p = Part(
             work_order_id=wo.id,
-            name=form.name.data.strip(),
-            qty=form.qty.data,
-            unit_cost=form.unit_cost.data,
+            name=part_form.name.data.strip(),
+            qty=part_form.qty.data,
+            unit_cost=part_form.unit_cost.data,
         )
         db.session.add(p)
         db.session.commit()
         flash("Part added", "success")
         return redirect(url_for("maintenance.wo_detail", wo_id=wo.id))
 
-    return render_template("maintenance/wo_detail.html", wo=wo, form=form)
+    if status_form.submit.data and status_form.validate_on_submit():
+        # Entry operator allowed to update status (no other edits here)
+        wo.status = WorkOrderStatus(status_form.status.data)
+        db.session.commit()
+        flash("Status updated", "success")
+        return redirect(url_for("maintenance.wo_detail", wo_id=wo.id))
+
+    return render_template("maintenance/wo_detail.html", wo=wo, part_form=part_form, status_form=status_form)
