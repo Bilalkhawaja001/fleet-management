@@ -26,6 +26,7 @@ def create_app(config_object=Config):
     from .blueprints.trips.routes import bp as trips_bp
     from .blueprints.fuel.routes import bp as fuel_bp
     from .blueprints.maintenance.routes import bp as maintenance_bp
+    from .blueprints.users.routes import bp as users_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(fleet_bp)
@@ -33,5 +34,6 @@ def create_app(config_object=Config):
     app.register_blueprint(trips_bp)
     app.register_blueprint(fuel_bp)
     app.register_blueprint(maintenance_bp)
+    app.register_blueprint(users_bp)
 
     return app

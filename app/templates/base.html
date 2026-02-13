@@ -17,6 +17,9 @@
       <a class="nav-link" href="/fuel/">Fuel</a>
       <a class="nav-link" href="/maintenance/schedules">Maintenance</a>
       <a class="nav-link" href="/maintenance/work-orders">Work Orders</a>
+      {% if current_user.is_authenticated and current_user.role.value == 'super_admin' %}
+        <a class="nav-link" href="/users/">Users</a>
+      {% endif %}
     </div>
     <div class="d-flex">
       {% if current_user.is_authenticated %}

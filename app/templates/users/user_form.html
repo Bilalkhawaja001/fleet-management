@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3 class="mb-3">{{ title }}</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      {{ form.username.label(class_='form-label') }}
+      {{ form.username(class_='form-control') }}
+    </div>
+    <div class="col-md-4 mb-3">
+      {{ form.password.label(class_='form-label') }}
+      {{ form.password(class_='form-control') }}
+    </div>
+    <div class="col-md-4 mb-3">
+      {{ form.role.label(class_='form-label') }}
+      {{ form.role(class_='form-select') }}
+    </div>
+  </div>
+  <div class="form-check mb-3">
+    {{ form.is_active(class_='form-check-input') }}
+    {{ form.is_active.label(class_='form-check-label') }}
+  </div>
+  {{ form.submit(class_='btn btn-primary') }}
+</form>
+{% endblock %}
