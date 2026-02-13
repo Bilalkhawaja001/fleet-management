@@ -42,6 +42,15 @@ def index():
     vehicles_total = Vehicle.query.count()
     drivers_total = Driver.query.count()
 
+    # Vehicles inside/outside mill (heuristic): outside = vehicles currently in an IN_TRANSIT trip
+    vehicles_outside = (
+        db.session.query(Trip.vehicle_id)
+        .filter(Trip.vehicle_id.isnot(None), Trip.status == TripStatus.IN_TRANSIT)
+        .distinct()
+        .count()
+    )
+    vehicles_inside = max(0, vehicles_total - vehicles_outside)
+
     # Maintenance
     open_wos_q = WorkOrder.query.filter(WorkOrder.status.in_([WorkOrderStatus.OPEN, WorkOrderStatus.IN_PROGRESS]))
     open_work_orders = open_wos_q.count()
@@ -115,6 +124,8 @@ def index():
         drivers_total=drivers_total,
         open_work_orders=open_work_orders,
         vehicles_under_maintenance=vehicles_under_maintenance,
+        vehicles_inside=vehicles_inside,
+        vehicles_outside=vehicles_outside,
         fuel_pending=fuel_pending,
         docs_expiring=docs_expiring,
         docs_expired=docs_expired,
