@@ -18,7 +18,11 @@
         <td>{{ v.make_model }}</td>
         <td>{{ v.year or '' }}</td>
         <td>{{ v.status }}</td>
-        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('fleet.vehicle_edit', vehicle_id=v.id) }}">Edit</a></td>
+        <td>
+          {% if current_user.role.value in ['super_admin','admin'] %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('fleet.vehicle_edit', vehicle_id=v.id) }}">Edit</a>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
   </tbody>

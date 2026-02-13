@@ -18,7 +18,11 @@
         <td>{{ d.phone or '' }}</td>
         <td>{{ d.license_no or '' }}</td>
         <td>{{ d.status }}</td>
-        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('drivers.driver_edit', driver_id=d.id) }}">Edit</a></td>
+        <td>
+          {% if current_user.role.value in ['super_admin','admin'] %}
+            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('drivers.driver_edit', driver_id=d.id) }}">Edit</a>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
   </tbody>
