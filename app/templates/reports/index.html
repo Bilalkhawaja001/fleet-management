@@ -15,6 +15,10 @@
     {{ form.vehicle_id.label(class_='form-label') }}
     {{ form.vehicle_id(class_='form-select') }}
   </div>
+  <div class="col-md-3">
+    {{ form.driver_id.label(class_='form-label') }}
+    {{ form.driver_id(class_='form-select') }}
+  </div>
   <div class="col-md-2">
     {{ form.submit(class_='btn btn-primary') }}
   </div>
@@ -33,6 +37,10 @@
   <li>Work Orders:
     <a href="{{ url_for('reports.work_orders_csv') }}{% if qs %}?{{ qs }}{% endif %}">CSV</a> |
     <a href="{{ url_for('reports.work_orders_pdf') }}{% if qs %}?{{ qs }}{% endif %}">PDF</a>
+  </li>
+  <li>Preventive Schedules:
+    <a href="{{ url_for('reports.preventive_schedules_csv') }}{% if qs %}?{{ qs }}{% endif %}">CSV</a> |
+    <a href="{{ url_for('reports.preventive_schedules_pdf') }}{% if qs %}?{{ qs }}{% endif %}">PDF</a>
   </li>
 </ul>
 {% endblock %}

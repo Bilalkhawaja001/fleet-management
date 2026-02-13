@@ -8,7 +8,7 @@ from flask_login import login_required
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from ...models import Trip, FuelLog, WorkOrder, Vehicle
+from ...models import Trip, FuelLog, WorkOrder, Vehicle, Driver, PreventiveSchedule
 from .forms import DateRangeForm
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
@@ -20,6 +20,10 @@ def _parse_date_range():
     # vehicle dropdown choices
     form.vehicle_id.choices = [(0, "All")]
     form.vehicle_id.choices += [(v.id, v.plate_no) for v in Vehicle.query.order_by(Vehicle.plate_no).all()]
+
+    # driver dropdown choices
+    form.driver_id.choices = [(0, "All")]
+    form.driver_id.choices += [(d.id, d.name) for d in Driver.query.order_by(Driver.name).all()]
 
     # Default: date-to-date = Today..Today
     if not request.args.get("start_date") and not request.args.get("end_date"):
@@ -37,13 +41,17 @@ def _parse_date_range():
     if vehicle_id == 0:
         vehicle_id = None
 
-    return form, start_dt, end_dt, vehicle_id
+    driver_id = (form.driver_id.data or 0) or 0
+    if driver_id == 0:
+        driver_id = None
+
+    return form, start_dt, end_dt, vehicle_id, driver_id
 
 
 @bp.get("/")
 @login_required
 def index():
-    form, _, _, _ = _parse_date_range()
+    form, _, _, _, _ = _parse_date_range()
     return render_template("reports/index.html", form=form)
 
 
@@ -62,7 +70,7 @@ def _csv_response(filename: str, rows, header):
     )
 
 
-def _pdf_simple_table(filename: str, title: str, header, rows):
+def _pdf_simple_table(filename: str, title: str, header, rows, subtitle: str | None = None):
     packet = io.BytesIO()
     c = canvas.Canvas(packet, pagesize=A4)
     width, height = A4
@@ -74,6 +82,9 @@ def _pdf_simple_table(filename: str, title: str, header, rows):
     y -= 25
     c.setFont("Helvetica", 9)
     c.drawString(40, y, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    if subtitle:
+        y -= 14
+        c.drawString(40, y, subtitle)
 
     y -= 25
     c.setFont("Helvetica-Bold", 9)
@@ -98,18 +109,34 @@ def _pdf_simple_table(filename: str, title: str, header, rows):
     return send_file(packet, as_attachment=True, download_name=filename, mimetype="application/pdf")
 
 
+def _subtitle(form: DateRangeForm):
+    s = form.start_date.data.isoformat() if form.start_date.data else ""
+    e = form.end_date.data.isoformat() if form.end_date.data else ""
+    v = ""
+    d = ""
+    if form.vehicle_id.data and int(form.vehicle_id.data) != 0:
+        veh = Vehicle.query.get(int(form.vehicle_id.data))
+        v = f" vehicle={veh.plate_no}" if veh else ""
+    if form.driver_id.data and int(form.driver_id.data) != 0:
+        dr = Driver.query.get(int(form.driver_id.data))
+        d = f" driver={dr.name}" if dr else ""
+    return f"Range: {s}..{e}{v}{d}".strip()
+
+
 @bp.get("/trips.csv")
 @login_required
 def trips_csv():
-    form, start_dt, end_dt, vehicle_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
     q = Trip.query
-    # Trips have created_at
     if start_dt:
         q = q.filter(Trip.created_at >= start_dt)
     if end_dt:
         q = q.filter(Trip.created_at <= end_dt)
     if vehicle_id:
         q = q.filter(Trip.vehicle_id == vehicle_id)
+    if driver_id:
+        q = q.filter(Trip.driver_id == driver_id)
+
     trips = q.order_by(Trip.id.desc()).all()
     rows = []
     for t in trips:
@@ -133,7 +160,7 @@ def trips_csv():
 @bp.get("/trips.pdf")
 @login_required
 def trips_pdf():
-    form, start_dt, end_dt, vehicle_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
     q = Trip.query
     if start_dt:
         q = q.filter(Trip.created_at >= start_dt)
@@ -141,6 +168,9 @@ def trips_pdf():
         q = q.filter(Trip.created_at <= end_dt)
     if vehicle_id:
         q = q.filter(Trip.vehicle_id == vehicle_id)
+    if driver_id:
+        q = q.filter(Trip.driver_id == driver_id)
+
     trips = q.order_by(Trip.id.desc()).all()
     rows = []
     for t in trips:
@@ -158,21 +188,22 @@ def trips_pdf():
         "Trips Report",
         ["id", "status", "vehicle", "driver", "route"],
         rows,
+        subtitle=_subtitle(form),
     )
 
 
 @bp.get("/fuel.csv")
 @login_required
 def fuel_csv():
-    form, start_dt, end_dt, vehicle_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
     q = FuelLog.query
-    # FuelLog has filled_at
     if start_dt:
         q = q.filter(FuelLog.filled_at >= start_dt)
     if end_dt:
         q = q.filter(FuelLog.filled_at <= end_dt)
     if vehicle_id:
         q = q.filter(FuelLog.vehicle_id == vehicle_id)
+
     logs = q.order_by(FuelLog.id.desc()).all()
     rows = []
     for l in logs:
@@ -196,7 +227,7 @@ def fuel_csv():
 @bp.get("/fuel.pdf")
 @login_required
 def fuel_pdf():
-    form, start_dt, end_dt, vehicle_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
     q = FuelLog.query
     if start_dt:
         q = q.filter(FuelLog.filled_at >= start_dt)
@@ -204,6 +235,7 @@ def fuel_pdf():
         q = q.filter(FuelLog.filled_at <= end_dt)
     if vehicle_id:
         q = q.filter(FuelLog.vehicle_id == vehicle_id)
+
     logs = q.order_by(FuelLog.id.desc()).all()
     rows = []
     for l in logs:
@@ -221,21 +253,22 @@ def fuel_pdf():
         "Fuel Logs Report",
         ["id", "vehicle", "liters", "amount", "odometer"],
         rows,
+        subtitle=_subtitle(form),
     )
 
 
 @bp.get("/work-orders.csv")
 @login_required
 def work_orders_csv():
-    form, start_dt, end_dt, vehicle_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
     q = WorkOrder.query
-    # WorkOrder has opened_at
     if start_dt:
         q = q.filter(WorkOrder.opened_at >= start_dt)
     if end_dt:
         q = q.filter(WorkOrder.opened_at <= end_dt)
     if vehicle_id:
         q = q.filter(WorkOrder.vehicle_id == vehicle_id)
+
     wos = q.order_by(WorkOrder.id.desc()).all()
     rows = []
     for wo in wos:
@@ -258,7 +291,7 @@ def work_orders_csv():
 @bp.get("/work-orders.pdf")
 @login_required
 def work_orders_pdf():
-    form, start_dt, end_dt, vehicle_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
     q = WorkOrder.query
     if start_dt:
         q = q.filter(WorkOrder.opened_at >= start_dt)
@@ -266,6 +299,7 @@ def work_orders_pdf():
         q = q.filter(WorkOrder.opened_at <= end_dt)
     if vehicle_id:
         q = q.filter(WorkOrder.vehicle_id == vehicle_id)
+
     wos = q.order_by(WorkOrder.id.desc()).all()
     rows = []
     for wo in wos:
@@ -282,4 +316,62 @@ def work_orders_pdf():
         "Work Orders Report",
         ["id", "status", "vehicle", "title"],
         rows,
+        subtitle=_subtitle(form),
+    )
+
+
+@bp.get("/preventive-schedules.csv")
+@login_required
+def preventive_schedules_csv():
+    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    q = PreventiveSchedule.query
+    if vehicle_id:
+        q = q.filter(PreventiveSchedule.vehicle_id == vehicle_id)
+    schedules = q.order_by(PreventiveSchedule.id.desc()).all()
+
+    rows = []
+    for s in schedules:
+        rows.append(
+            [
+                s.id,
+                s.vehicle.plate_no,
+                s.title,
+                s.interval_km or "",
+                s.interval_days or "",
+                s.active,
+            ]
+        )
+    return _csv_response(
+        "preventive_schedules.csv",
+        rows,
+        ["id", "vehicle", "title", "interval_km", "interval_days", "active"],
+    )
+
+
+@bp.get("/preventive-schedules.pdf")
+@login_required
+def preventive_schedules_pdf():
+    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    q = PreventiveSchedule.query
+    if vehicle_id:
+        q = q.filter(PreventiveSchedule.vehicle_id == vehicle_id)
+    schedules = q.order_by(PreventiveSchedule.id.desc()).all()
+
+    rows = []
+    for s in schedules:
+        rows.append(
+            [
+                s.id,
+                s.vehicle.plate_no,
+                s.title,
+                s.interval_km or "",
+                s.interval_days or "",
+            ]
+        )
+    return _pdf_simple_table(
+        "preventive_schedules.pdf",
+        "Preventive Schedules Report",
+        ["id", "vehicle", "title", "km", "days"],
+        rows,
+        subtitle=_subtitle(form),
     )
