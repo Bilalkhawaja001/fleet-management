@@ -79,3 +79,18 @@ def trip_edit(trip_id: int):
         return redirect(url_for("trips.trip_list"))
 
     return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
+
+
+@bp.post("/<int:trip_id>/delete")
+@login_required
+@role_required(Role.SUPER_ADMIN, Role.ADMIN)
+def trip_delete(trip_id: int):
+    t = db.session.get(Trip, trip_id)
+    if not t:
+        flash("Trip not found", "warning")
+        return redirect(url_for("trips.trip_list"))
+
+    db.session.delete(t)
+    db.session.commit()
+    flash("Trip deleted", "success")
+    return redirect(url_for("trips.trip_list"))

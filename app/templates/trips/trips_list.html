@@ -18,7 +18,14 @@
         <td>{{ t.vehicle.plate_no if t.vehicle else '' }}</td>
         <td>{{ t.driver.name if t.driver else '' }}</td>
         <td>{{ (t.origin or '') ~ ' → ' ~ (t.destination or '') }}</td>
-        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}">Edit</a></td>
+        <td>
+          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}">Edit</a>
+          {% if current_user.role.value in ['super_admin','admin'] %}
+            <form method="post" action="{{ url_for('trips.trip_delete', trip_id=t.id) }}" style="display:inline-block" onsubmit="return confirm('Delete trip?')">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+            </form>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
   </tbody>
