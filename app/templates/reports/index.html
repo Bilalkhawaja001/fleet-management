@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3 class="mb-3">Reports</h3>
+<ul>
+  <li>Trips: <a href="{{ url_for('reports.trips_csv') }}">CSV</a> | <a href="{{ url_for('reports.trips_pdf') }}">PDF</a></li>
+  <li>Fuel Logs: <a href="{{ url_for('reports.fuel_csv') }}">CSV</a> | <a href="{{ url_for('reports.fuel_pdf') }}">PDF</a></li>
+  <li>Work Orders: <a href="{{ url_for('reports.work_orders_csv') }}">CSV</a> | <a href="{{ url_for('reports.work_orders_pdf') }}">PDF</a></li>
+</ul>
+{% endblock %}
