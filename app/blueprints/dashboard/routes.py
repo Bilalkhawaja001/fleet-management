@@ -97,6 +97,20 @@ def index():
     recent_trips = (
         trips_today_q.order_by(Trip.time_out.desc().nullslast(), Trip.id.desc()).limit(10).all()
     )
+
+    # Upcoming scheduled trips (next 7 days) based on time_out
+    upcoming_start = datetime.combine(today + timedelta(days=1), time.min)
+    upcoming_end = datetime.combine(today + timedelta(days=7), time.max)
+    upcoming_trips = (
+        Trip.query.filter(
+            Trip.time_out >= upcoming_start,
+            Trip.time_out <= upcoming_end,
+            Trip.status.in_([TripStatus.PLANNED, TripStatus.ASSIGNED]),
+        )
+        .order_by(Trip.time_out.asc())
+        .limit(10)
+        .all()
+    )
     recent_work_orders = open_wos_q.order_by(WorkOrder.id.desc()).limit(10).all()
     recent_docs_expiring = (
         VehicleDocument.query.filter(
@@ -132,6 +146,9 @@ def index():
         missing_docs_vehicles=missing_docs_vehicles,
         incidents_open=incidents_open,
         recent_trips=recent_trips,
+        upcoming_trips=upcoming_trips,
+        upcoming_start=upcoming_start,
+        upcoming_end=upcoming_end,
         recent_work_orders=recent_work_orders,
         recent_docs_expiring=recent_docs_expiring,
         recent_fuel_pending=recent_fuel_pending,

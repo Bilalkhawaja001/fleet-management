@@ -132,6 +132,41 @@
   <div class="col-lg-6">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="fw-semibold">Upcoming Scheduled Trips (next 7 days)</div>
+        <a class="btn btn-sm btn-outline-secondary" href="/trips/">View all</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-striped mb-0">
+            <thead>
+              <tr>
+                <th>ID</th><th>Date/Time</th><th>Vehicle</th><th>Driver</th><th>Employee</th><th>Route</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in upcoming_trips %}
+                <tr>
+                  <td>{{ t.id }}</td>
+                  <td>{{ t.time_out.strftime('%Y-%m-%d %H:%M') if t.time_out else '' }}</td>
+                  <td>{{ t.vehicle.plate_no if t.vehicle else '' }}</td>
+                  <td>{{ t.driver.name if t.driver else '' }}</td>
+                  <td>{{ t.employee_name or '' }}</td>
+                  <td>{{ (t.origin or '') ~ ' → ' ~ (t.destination_city or '') ~ ' → ' ~ (t.destination or '') }}</td>
+                </tr>
+              {% endfor %}
+              {% if not upcoming_trips %}
+                <tr><td colspan="6" class="text-muted p-3">No scheduled trips in next 7 days.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
         <div class="fw-semibold">Work Orders (Open)</div>
         <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders?status=open">View all</a>
       </div>
