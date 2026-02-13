@@ -142,6 +142,7 @@ def trips_csv():
     trips = q.order_by(Trip.id.desc()).all()
     rows = []
     for t in trips:
+        route = " → ".join([p for p in [t.origin or "", t.destination_city or "", t.destination or ""] if p])
         rows.append(
             [
                 t.id,
@@ -149,13 +150,10 @@ def trips_csv():
                 t.usage_type.value if t.usage_type else "",
                 t.vehicle.plate_no if t.vehicle else "",
                 t.driver.name if t.driver else "",
-                t.origin or "",
-                t.destination_city or "",
-                t.destination or "",
-                t.odometer_start or "",
-                t.odometer_end or "",
                 t.time_out.strftime("%Y-%m-%d %H:%M") if t.time_out else "",
                 t.time_in.strftime("%Y-%m-%d %H:%M") if t.time_in else "",
+                t.odometer_start or "",
+                t.odometer_end or "",
                 t.distance_km or "",
                 f"{t.fuel_liters:.2f}" if t.fuel_liters else "",
                 f"{t.fuel_amount:.2f}" if t.fuel_amount else "",
@@ -163,24 +161,22 @@ def trips_csv():
                 f"{t.other_amount:.2f}" if t.other_amount else "",
                 f"{t.total_expenses:.2f}" if t.total_expenses else "",
                 f"{t.fuel_avg_km_per_l:.2f}" if t.fuel_avg_km_per_l else "",
+                route,
             ]
         )
     return _csv_response(
         "trips.csv",
         rows,
         [
-            "id",
+            "trip_id",
             "status",
             "usage_type",
             "vehicle",
             "driver",
-            "origin",
-            "destination_city",
-            "destination",
-            "odometer_start",
-            "odometer_end",
             "time_out",
             "time_in",
+            "start_odo",
+            "end_odo",
             "distance_km",
             "fuel_liters",
             "fuel_amount",
@@ -188,6 +184,7 @@ def trips_csv():
             "other_amount",
             "total_expenses",
             "fuel_avg_km_per_l",
+            "route",
         ],
     )
 
@@ -209,6 +206,7 @@ def trips_pdf():
     trips = q.order_by(Trip.id.desc()).all()
     rows = []
     for t in trips:
+        route = " → ".join([p for p in [t.origin or "", t.destination_city or "", t.destination or ""] if p])
         rows.append(
             [
                 t.id,
@@ -216,10 +214,10 @@ def trips_pdf():
                 t.usage_type.value if t.usage_type else "",
                 t.vehicle.plate_no if t.vehicle else "",
                 t.driver.name if t.driver else "",
-                t.odometer_start or "",
-                t.odometer_end or "",
                 t.time_out.strftime("%Y-%m-%d %H:%M") if t.time_out else "",
                 t.time_in.strftime("%Y-%m-%d %H:%M") if t.time_in else "",
+                t.odometer_start or "",
+                t.odometer_end or "",
                 t.distance_km or "",
                 f"{t.fuel_liters:.2f}" if t.fuel_liters else "",
                 f"{t.fuel_amount:.2f}" if t.fuel_amount else "",
@@ -227,29 +225,29 @@ def trips_pdf():
                 f"{t.other_amount:.2f}" if t.other_amount else "",
                 f"{t.total_expenses:.2f}" if t.total_expenses else "",
                 f"{t.fuel_avg_km_per_l:.2f}" if t.fuel_avg_km_per_l else "",
-                (t.origin or "") + "->" + (t.destination or ""),
+                route,
             ]
         )
     return _pdf_simple_table(
         "trips.pdf",
         "Trips Report",
         [
-            "id",
+            "trip_id",
             "status",
-            "usage",
+            "usage_type",
             "vehicle",
             "driver",
-            "start_odo",
-            "end_odo",
             "time_out",
             "time_in",
-            "km",
-            "fuel_l",
-            "fuel_rs",
-            "toll_rs",
-            "other_rs",
-            "total_rs",
-            "km/L",
+            "start_odo",
+            "end_odo",
+            "distance_km",
+            "fuel_liters",
+            "fuel_amount",
+            "toll_amount",
+            "other_amount",
+            "total_expenses",
+            "fuel_avg_km_per_l",
             "route",
         ],
         rows,
