@@ -13,6 +13,8 @@ from ...models import (
     Trip,
     TripStatus,
     Vehicle,
+    VehicleBooking,
+    BookingStatus,
     VehicleDocument,
     VehicleDocStatus,
     VehicleDocType,
@@ -111,6 +113,18 @@ def index():
         .limit(10)
         .all()
     )
+
+    # Upcoming vehicle bookings (next 7 days)
+    upcoming_bookings = (
+        VehicleBooking.query.filter(
+            VehicleBooking.start_at >= upcoming_start,
+            VehicleBooking.start_at <= upcoming_end,
+            VehicleBooking.status == BookingStatus.SCHEDULED,
+        )
+        .order_by(VehicleBooking.start_at.asc())
+        .limit(10)
+        .all()
+    )
     recent_work_orders = open_wos_q.order_by(WorkOrder.id.desc()).limit(10).all()
     recent_docs_expiring = (
         VehicleDocument.query.filter(
@@ -147,6 +161,7 @@ def index():
         incidents_open=incidents_open,
         recent_trips=recent_trips,
         upcoming_trips=upcoming_trips,
+        upcoming_bookings=upcoming_bookings,
         upcoming_start=upcoming_start,
         upcoming_end=upcoming_end,
         recent_work_orders=recent_work_orders,

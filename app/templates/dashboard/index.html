@@ -167,6 +167,41 @@
   <div class="col-lg-6">
     <div class="card">
       <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="fw-semibold">Upcoming Vehicle Bookings (next 7 days)</div>
+        <a class="btn btn-sm btn-outline-secondary" href="/bookings/">View all</a>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-striped mb-0">
+            <thead>
+              <tr>
+                <th>ID</th><th>Date/Time</th><th>Vehicle</th><th>Employee</th><th>Department</th><th>Purpose</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for b in upcoming_bookings %}
+                <tr>
+                  <td>{{ b.id }}</td>
+                  <td>{{ b.start_at.strftime('%Y-%m-%d %H:%M') if b.start_at else '' }}</td>
+                  <td>{{ b.vehicle.plate_no if b.vehicle else '' }}</td>
+                  <td>{{ b.employee_name }}</td>
+                  <td>{{ b.department or '' }}</td>
+                  <td>{{ b.purpose or '' }}</td>
+                </tr>
+              {% endfor %}
+              {% if not upcoming_bookings %}
+                <tr><td colspan="6" class="text-muted p-3">No vehicle bookings in next 7 days.</td></tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
         <div class="fw-semibold">Work Orders (Open)</div>
         <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders?status=open">View all</a>
       </div>

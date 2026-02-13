@@ -6,6 +6,7 @@ from .trip_expense import TripExpense, TripExpenseType
 from .fuel_log import FuelLog
 from .fuel_entry import FuelEntry, FuelEntryStatus, FuelType
 from .vehicle_document import VehicleDocument, VehicleDocType, VehicleDocStatus
+from .vehicle_booking import VehicleBooking, BookingStatus
 from .notification import Notification, NotificationType, NotificationSeverity
 from .maintenance_plan2 import MaintenancePlan, ScheduleMode
 from .maintenance import PreventiveSchedule, WorkOrder, WorkOrderStatus, WorkOrderType, WorkSource, Part
@@ -31,6 +32,8 @@ __all__ = [
     "VehicleDocument",
     "VehicleDocType",
     "VehicleDocStatus",
+    "VehicleBooking",
+    "BookingStatus",
     "Notification",
     "NotificationType",
     "NotificationSeverity",

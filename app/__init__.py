@@ -30,6 +30,7 @@ def create_app(config_object=Config):
     from .blueprints.reports.routes import bp as reports_bp
     from .blueprints.documents.routes import bp as documents_bp
     from .blueprints.incidents.routes import bp as incidents_bp
+    from .blueprints.bookings.routes import bp as bookings_bp
     from .blueprints.dashboard.routes import bp as dashboard_bp
 
     app.register_blueprint(auth_bp)
@@ -43,5 +44,6 @@ def create_app(config_object=Config):
     app.register_blueprint(reports_bp)
     app.register_blueprint(documents_bp)
     app.register_blueprint(incidents_bp)
+    app.register_blueprint(bookings_bp)
 
     return app

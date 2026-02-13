@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Vehicle Bookings</h3>
+  <a class="btn btn-sm btn-success" href="{{ url_for('bookings.booking_create') }}">New</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th><th>Vehicle</th><th>Employee</th><th>Department</th><th>Start</th><th>End</th><th>Status</th><th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.vehicle.plate_no if r.vehicle else '' }}</td>
+        <td>{{ r.employee_name }}</td>
+        <td>{{ r.department or '' }}</td>
+        <td>{{ r.start_at.strftime('%Y-%m-%d %H:%M') if r.start_at else '' }}</td>
+        <td>{{ r.end_at.strftime('%Y-%m-%d %H:%M') if r.end_at else '' }}</td>
+        <td>{{ r.status.value }}</td>
+        <td>{{ r.purpose or '' }}</td>
+      </tr>
+    {% endfor %}
+    {% if not rows %}
+      <tr><td colspan="8" class="text-muted p-3">No bookings yet.</td></tr>
+    {% endif %}
+  </tbody>
+</table>
+{% endblock %}

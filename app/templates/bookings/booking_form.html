@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3 class="mb-3">{{ title }}</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      {{ form.vehicle_id.label(class_='form-label') }}
+      {{ form.vehicle_id(class_='form-select') }}
+    </div>
+    <div class="col-md-6 mb-3">
+      {{ form.employee_name.label(class_='form-label') }}
+      {{ form.employee_name(class_='form-control') }}
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      {{ form.department.label(class_='form-label') }}
+      {{ form.department(class_='form-control') }}
+    </div>
+    <div class="col-md-6 mb-3">
+      {{ form.purpose.label(class_='form-label') }}
+      {{ form.purpose(class_='form-control') }}
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      {{ form.start_at.label(class_='form-label') }}
+      {{ form.start_at(class_='form-control', type='datetime-local') }}
+    </div>
+    <div class="col-md-6 mb-3">
+      {{ form.end_at.label(class_='form-label') }}
+      {{ form.end_at(class_='form-control', type='datetime-local') }}
+    </div>
+  </div>
+
+  {{ form.submit(class_='btn btn-primary') }}
+  <a class="btn btn-secondary" href="{{ url_for('bookings.booking_list') }}">Cancel</a>
+</form>
+{% endblock %}
