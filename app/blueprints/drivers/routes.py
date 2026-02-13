@@ -55,3 +55,18 @@ def driver_edit(driver_id: int):
         return redirect(url_for("drivers.driver_list"))
 
     return render_template("drivers/driver_form.html", form=form, title=f"Edit Driver #{d.id}")
+
+
+@bp.post("/<int:driver_id>/delete")
+@login_required
+@role_required(Role.SUPER_ADMIN, Role.ADMIN)
+def driver_delete(driver_id: int):
+    d = db.session.get(Driver, driver_id)
+    if not d:
+        flash("Driver not found", "warning")
+        return redirect(url_for("drivers.driver_list"))
+
+    db.session.delete(d)
+    db.session.commit()
+    flash("Driver deleted", "success")
+    return redirect(url_for("drivers.driver_list"))

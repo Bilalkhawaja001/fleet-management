@@ -55,3 +55,18 @@ def vehicle_edit(vehicle_id: int):
         return redirect(url_for("fleet.vehicle_list"))
 
     return render_template("fleet/vehicle_form.html", form=form, title=f"Edit Vehicle #{v.id}")
+
+
+@bp.post("/vehicles/<int:vehicle_id>/delete")
+@login_required
+@role_required(Role.SUPER_ADMIN, Role.ADMIN)
+def vehicle_delete(vehicle_id: int):
+    v = db.session.get(Vehicle, vehicle_id)
+    if not v:
+        flash("Vehicle not found", "warning")
+        return redirect(url_for("fleet.vehicle_list"))
+
+    db.session.delete(v)
+    db.session.commit()
+    flash("Vehicle deleted", "success")
+    return redirect(url_for("fleet.vehicle_list"))

@@ -21,6 +21,9 @@
         <td>
           {% if current_user.role.value in ['super_admin','admin'] %}
             <a class="btn btn-sm btn-outline-primary" href="{{ url_for('fleet.vehicle_edit', vehicle_id=v.id) }}">Edit</a>
+            <form method="post" action="{{ url_for('fleet.vehicle_delete', vehicle_id=v.id) }}" style="display:inline-block" onsubmit="return confirm('Delete vehicle?')">
+              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+            </form>
           {% endif %}
         </td>
       </tr>
