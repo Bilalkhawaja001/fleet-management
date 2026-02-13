@@ -1,5 +1,5 @@
 from flask_wtf import FlaskForm
-from wtforms import StringField, IntegerField, SubmitField
+from wtforms import StringField, IntegerField, SubmitField, SelectField
 from wtforms.validators import DataRequired, Optional
 
 
@@ -8,4 +8,5 @@ class VehicleForm(FlaskForm):
     make_model = StringField("Make/Model", validators=[DataRequired()])
     year = IntegerField("Year", validators=[Optional()])
     status = StringField("Status", validators=[DataRequired()])
+    current_driver_id = SelectField("Current Driver", coerce=int)
     submit = SubmitField("Save")

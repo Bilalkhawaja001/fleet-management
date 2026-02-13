@@ -21,6 +21,12 @@
       {{ form.status(class_='form-control') }}
     </div>
   </div>
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      {{ form.current_driver_id.label(class_='form-label') }}
+      {{ form.current_driver_id(class_='form-select') }}
+    </div>
+  </div>
   {{ form.submit(class_='btn btn-primary') }}
 </form>
 {% endblock %}
