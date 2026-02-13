@@ -16,6 +16,13 @@ bp = Blueprint("reports", __name__, url_prefix="/reports")
 
 def _parse_date_range():
     form = DateRangeForm(request.args)
+
+    # Default: date-to-date = Today..Today
+    if not request.args.get("start_date") and not request.args.get("end_date"):
+        today = date.today()
+        form.start_date.data = today
+        form.end_date.data = today
+
     start_dt = end_dt = None
     if form.start_date.data:
         start_dt = datetime.combine(form.start_date.data, time.min)
