@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Trips</h3>
+  <a class="btn btn-sm btn-success" href="{{ url_for('trips.trip_create') }}">New</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th><th>Status</th><th>Vehicle</th><th>Driver</th><th>Route</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in trips %}
+      <tr>
+        <td>{{ t.id }}</td>
+        <td>{{ t.status.value }}</td>
+        <td>{{ t.vehicle.plate_no if t.vehicle else '' }}</td>
+        <td>{{ t.driver.name if t.driver else '' }}</td>
+        <td>{{ (t.origin or '') ~ ' → ' ~ (t.destination or '') }}</td>
+        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}">Edit</a></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

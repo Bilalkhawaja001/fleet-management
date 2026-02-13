@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3 class="mb-3">{{ title }}</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="row">
+    <div class="col-md-4 mb-3">
+      {{ form.plate_no.label(class_='form-label') }}
+      {{ form.plate_no(class_='form-control') }}
+    </div>
+    <div class="col-md-5 mb-3">
+      {{ form.make_model.label(class_='form-label') }}
+      {{ form.make_model(class_='form-control') }}
+    </div>
+    <div class="col-md-1 mb-3">
+      {{ form.year.label(class_='form-label') }}
+      {{ form.year(class_='form-control') }}
+    </div>
+    <div class="col-md-2 mb-3">
+      {{ form.status.label(class_='form-label') }}
+      {{ form.status(class_='form-control') }}
+    </div>
+  </div>
+  {{ form.submit(class_='btn btn-primary') }}
+</form>
+{% endblock %}

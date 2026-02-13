@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Fuel Logs</h3>
+  <a class="btn btn-sm btn-success" href="{{ url_for('fuel.fuel_create') }}">New</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th><th>Vehicle</th><th>Liters</th><th>Amount</th><th>Odometer</th><th>Vendor</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for l in logs %}
+      <tr>
+        <td>{{ l.id }}</td>
+        <td>{{ l.vehicle.plate_no }}</td>
+        <td>{{ l.liters }}</td>
+        <td>{{ l.amount or '' }}</td>
+        <td>{{ l.odometer_km or '' }}</td>
+        <td>{{ l.vendor or '' }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3 class="mb-3">{{ title }}</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      {{ form.vehicle_id.label(class_='form-label') }}
+      {{ form.vehicle_id(class_='form-select') }}
+    </div>
+    <div class="col-md-3 mb-3">
+      {{ form.liters.label(class_='form-label') }}
+      {{ form.liters(class_='form-control') }}
+    </div>
+    <div class="col-md-3 mb-3">
+      {{ form.amount.label(class_='form-label') }}
+      {{ form.amount(class_='form-control') }}
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-3 mb-3">
+      {{ form.odometer_km.label(class_='form-label') }}
+      {{ form.odometer_km(class_='form-control') }}
+    </div>
+    <div class="col-md-4 mb-3">
+      {{ form.vendor.label(class_='form-label') }}
+      {{ form.vendor(class_='form-control') }}
+    </div>
+  </div>
+  <div class="mb-3">
+    {{ form.notes.label(class_='form-label') }}
+    {{ form.notes(class_='form-control', rows=3) }}
+  </div>
+  {{ form.submit(class_='btn btn-primary') }}
+</form>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Preventive Schedules</h3>
+  <a class="btn btn-sm btn-success" href="{{ url_for('maintenance.schedule_create') }}">New</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th><th>Vehicle</th><th>Title</th><th>Interval km</th><th>Interval days</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for s in schedules %}
+      <tr>
+        <td>{{ s.id }}</td>
+        <td>{{ s.vehicle.plate_no }}</td>
+        <td>{{ s.title }}</td>
+        <td>{{ s.interval_km or '' }}</td>
+        <td>{{ s.interval_days or '' }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

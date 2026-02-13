@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<h3 class="mb-3">{{ title }}</h3>
+<form method="post">
+  {{ form.hidden_tag() }}
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      {{ form.vehicle_id.label(class_='form-label') }}
+      {{ form.vehicle_id(class_='form-select') }}
+    </div>
+    <div class="col-md-6 mb-3">
+      {{ form.title.label(class_='form-label') }}
+      {{ form.title(class_='form-control') }}
+    </div>
+  </div>
+  <div class="row">
+    <div class="col-md-3 mb-3">
+      {{ form.interval_km.label(class_='form-label') }}
+      {{ form.interval_km(class_='form-control') }}
+    </div>
+    <div class="col-md-3 mb-3">
+      {{ form.interval_days.label(class_='form-label') }}
+      {{ form.interval_days(class_='form-control') }}
+    </div>
+  </div>
+  {{ form.submit(class_='btn btn-primary') }}
+</form>
+{% endblock %}

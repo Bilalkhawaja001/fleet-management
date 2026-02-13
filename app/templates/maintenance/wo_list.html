@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3>Work Orders</h3>
+  <a class="btn btn-sm btn-success" href="{{ url_for('maintenance.wo_create') }}">New</a>
+</div>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th><th>Status</th><th>Vehicle</th><th>Title</th><th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for wo in work_orders %}
+      <tr>
+        <td>{{ wo.id }}</td>
+        <td>{{ wo.status.value }}</td>
+        <td>{{ wo.vehicle.plate_no }}</td>
+        <td>{{ wo.title }}</td>
+        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('maintenance.wo_detail', wo_id=wo.id) }}">Open</a></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
