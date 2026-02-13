@@ -1,22 +1,34 @@
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, date, time
 
-from flask import Blueprint, render_template, Response, send_file
+from flask import Blueprint, render_template, Response, send_file, request
 from flask_login import login_required
 
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
 from ...models import Trip, FuelLog, WorkOrder
+from .forms import DateRangeForm
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
+
+
+def _parse_date_range():
+    form = DateRangeForm(request.args)
+    start_dt = end_dt = None
+    if form.start_date.data:
+        start_dt = datetime.combine(form.start_date.data, time.min)
+    if form.end_date.data:
+        end_dt = datetime.combine(form.end_date.data, time.max)
+    return form, start_dt, end_dt
 
 
 @bp.get("/")
 @login_required
 def index():
-    return render_template("reports/index.html")
+    form, _, _ = _parse_date_range()
+    return render_template("reports/index.html", form=form)
 
 
 def _csv_response(filename: str, rows, header):
@@ -73,7 +85,14 @@ def _pdf_simple_table(filename: str, title: str, header, rows):
 @bp.get("/trips.csv")
 @login_required
 def trips_csv():
-    trips = Trip.query.order_by(Trip.id.desc()).all()
+    form, start_dt, end_dt = _parse_date_range()
+    q = Trip.query
+    # Trips have created_at
+    if start_dt:
+        q = q.filter(Trip.created_at >= start_dt)
+    if end_dt:
+        q = q.filter(Trip.created_at <= end_dt)
+    trips = q.order_by(Trip.id.desc()).all()
     rows = []
     for t in trips:
         rows.append(
@@ -96,7 +115,13 @@ def trips_csv():
 @bp.get("/trips.pdf")
 @login_required
 def trips_pdf():
-    trips = Trip.query.order_by(Trip.id.desc()).all()
+    form, start_dt, end_dt = _parse_date_range()
+    q = Trip.query
+    if start_dt:
+        q = q.filter(Trip.created_at >= start_dt)
+    if end_dt:
+        q = q.filter(Trip.created_at <= end_dt)
+    trips = q.order_by(Trip.id.desc()).all()
     rows = []
     for t in trips:
         rows.append(
@@ -119,7 +144,14 @@ def trips_pdf():
 @bp.get("/fuel.csv")
 @login_required
 def fuel_csv():
-    logs = FuelLog.query.order_by(FuelLog.id.desc()).all()
+    form, start_dt, end_dt = _parse_date_range()
+    q = FuelLog.query
+    # FuelLog has filled_at
+    if start_dt:
+        q = q.filter(FuelLog.filled_at >= start_dt)
+    if end_dt:
+        q = q.filter(FuelLog.filled_at <= end_dt)
+    logs = q.order_by(FuelLog.id.desc()).all()
     rows = []
     for l in logs:
         rows.append(
@@ -142,7 +174,13 @@ def fuel_csv():
 @bp.get("/fuel.pdf")
 @login_required
 def fuel_pdf():
-    logs = FuelLog.query.order_by(FuelLog.id.desc()).all()
+    form, start_dt, end_dt = _parse_date_range()
+    q = FuelLog.query
+    if start_dt:
+        q = q.filter(FuelLog.filled_at >= start_dt)
+    if end_dt:
+        q = q.filter(FuelLog.filled_at <= end_dt)
+    logs = q.order_by(FuelLog.id.desc()).all()
     rows = []
     for l in logs:
         rows.append(
@@ -165,7 +203,14 @@ def fuel_pdf():
 @bp.get("/work-orders.csv")
 @login_required
 def work_orders_csv():
-    wos = WorkOrder.query.order_by(WorkOrder.id.desc()).all()
+    form, start_dt, end_dt = _parse_date_range()
+    q = WorkOrder.query
+    # WorkOrder has opened_at
+    if start_dt:
+        q = q.filter(WorkOrder.opened_at >= start_dt)
+    if end_dt:
+        q = q.filter(WorkOrder.opened_at <= end_dt)
+    wos = q.order_by(WorkOrder.id.desc()).all()
     rows = []
     for wo in wos:
         rows.append(
@@ -187,7 +232,13 @@ def work_orders_csv():
 @bp.get("/work-orders.pdf")
 @login_required
 def work_orders_pdf():
-    wos = WorkOrder.query.order_by(WorkOrder.id.desc()).all()
+    form, start_dt, end_dt = _parse_date_range()
+    q = WorkOrder.query
+    if start_dt:
+        q = q.filter(WorkOrder.opened_at >= start_dt)
+    if end_dt:
+        q = q.filter(WorkOrder.opened_at <= end_dt)
+    wos = q.order_by(WorkOrder.id.desc()).all()
     rows = []
     for wo in wos:
         rows.append(
