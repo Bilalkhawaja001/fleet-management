@@ -8,7 +8,7 @@ from flask_login import login_required
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
 
-from ...models import Trip, FuelEntry, WorkOrder, Vehicle, Driver, PreventiveSchedule
+from ...models import Trip, FuelEntry, FuelPurpose, WorkOrder, Vehicle, Driver, PreventiveSchedule
 from .forms import DateRangeForm
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
@@ -45,13 +45,15 @@ def _parse_date_range():
     if driver_id == 0:
         driver_id = None
 
-    return form, start_dt, end_dt, vehicle_id, driver_id
+    fuel_purpose = (form.fuel_purpose.data or "").strip() or None
+
+    return form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose
 
 
 @bp.get("/")
 @login_required
 def index():
-    form, _, _, _, _ = _parse_date_range()
+    form, _, _, _, _, _ = _parse_date_range()
     return render_template("reports/index.html", form=form)
 
 
@@ -122,13 +124,14 @@ def _subtitle(form: DateRangeForm):
     if form.driver_id.data and int(form.driver_id.data) != 0:
         dr = Driver.query.get(int(form.driver_id.data))
         d = f" driver={dr.name}" if dr else ""
-    return f"Range: {s}..{e}{v}{d}".strip()
+    p = f" fuel_purpose={form.fuel_purpose.data}" if getattr(form, 'fuel_purpose', None) and form.fuel_purpose.data else ""
+    return f"Range: {s}..{e}{v}{d}{p}".strip()
 
 
 @bp.get("/trips.csv")
 @login_required
 def trips_csv():
-    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose = _parse_date_range()
     q = Trip.query
     if start_dt:
         q = q.filter(Trip.created_at >= start_dt)
@@ -192,7 +195,7 @@ def trips_csv():
 @bp.get("/trips.pdf")
 @login_required
 def trips_pdf():
-    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose = _parse_date_range()
     q = Trip.query
     if start_dt:
         q = q.filter(Trip.created_at >= start_dt)
@@ -259,7 +262,7 @@ def trips_pdf():
 @bp.get("/fuel.csv")
 @login_required
 def fuel_csv():
-    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose = _parse_date_range()
     q = FuelEntry.query
     if start_dt:
         q = q.filter(FuelEntry.created_at >= start_dt)
@@ -269,34 +272,54 @@ def fuel_csv():
         q = q.filter(FuelEntry.vehicle_id == vehicle_id)
     if driver_id:
         q = q.filter(FuelEntry.driver_id == driver_id)
+    if fuel_purpose:
+        q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose))
 
     logs = q.order_by(FuelEntry.id.desc()).all()
     rows = []
+    totals_by_purpose: dict[str, float] = {
+        FuelPurpose.OFFICIAL.value: 0.0,
+        FuelPurpose.PERSONAL.value: 0.0,
+        FuelPurpose.SCHOOL_VAN.value: 0.0,
+        FuelPurpose.EDUCATION.value: 0.0,
+    }
+
     for l in logs:
+        amt = float(l.amount or 0)
+        purpose = l.fuel_purpose.value if l.fuel_purpose else FuelPurpose.OFFICIAL.value
+        totals_by_purpose[purpose] = totals_by_purpose.get(purpose, 0.0) + amt
         rows.append(
             [
                 l.id,
+                l.slip_no,
                 l.vehicle.plate_no if l.vehicle else "",
                 l.driver.name if l.driver else "",
                 l.trip_id or "",
                 l.fuel_date.isoformat() if l.fuel_date else "",
+                purpose,
                 str(l.liters),
                 str(l.rate or ""),
                 str(l.amount or ""),
                 l.status.value,
             ]
         )
+
+    rows.append([])
+    rows.append(["summary", "fuel_purpose", "total_amount"])
+    for p in [FuelPurpose.OFFICIAL, FuelPurpose.PERSONAL, FuelPurpose.SCHOOL_VAN, FuelPurpose.EDUCATION]:
+        rows.append(["summary", p.value, f"{totals_by_purpose.get(p.value, 0.0):.2f}"])
+
     return _csv_response(
         "fuel_entries.csv",
         rows,
-        ["id", "vehicle", "driver", "trip_id", "fuel_date", "liters", "rate", "amount", "status"],
+        ["id", "slip_no", "vehicle", "driver", "trip_id", "fuel_date", "fuel_purpose", "liters", "rate", "amount", "status"],
     )
 
 
 @bp.get("/fuel.pdf")
 @login_required
 def fuel_pdf():
-    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose = _parse_date_range()
     q = FuelEntry.query
     if start_dt:
         q = q.filter(FuelEntry.created_at >= start_dt)
@@ -306,27 +329,46 @@ def fuel_pdf():
         q = q.filter(FuelEntry.vehicle_id == vehicle_id)
     if driver_id:
         q = q.filter(FuelEntry.driver_id == driver_id)
+    if fuel_purpose:
+        q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose))
 
     logs = q.order_by(FuelEntry.id.desc()).all()
     rows = []
+    totals_by_purpose: dict[str, float] = {
+        FuelPurpose.OFFICIAL.value: 0.0,
+        FuelPurpose.PERSONAL.value: 0.0,
+        FuelPurpose.SCHOOL_VAN.value: 0.0,
+        FuelPurpose.EDUCATION.value: 0.0,
+    }
+
     for l in logs:
+        purpose = l.fuel_purpose.value if l.fuel_purpose else FuelPurpose.OFFICIAL.value
+        totals_by_purpose[purpose] = totals_by_purpose.get(purpose, 0.0) + float(l.amount or 0)
         rows.append(
             [
                 l.id,
+                l.slip_no,
                 l.vehicle.plate_no if l.vehicle else "",
                 l.driver.name if l.driver else "",
                 l.trip_id or "",
                 l.fuel_date.isoformat() if l.fuel_date else "",
+                purpose,
                 str(l.liters),
                 str(l.rate or ""),
                 str(l.amount or ""),
                 l.status.value,
             ]
         )
+
+    rows.append(["", "", "", "", "", "", "", "", "", "", ""])
+    rows.append(["SUMMARY", "", "", "", "", "", "PURPOSE", "", "", "TOTAL", ""])
+    for p in [FuelPurpose.OFFICIAL, FuelPurpose.PERSONAL, FuelPurpose.SCHOOL_VAN, FuelPurpose.EDUCATION]:
+        rows.append(["", "", "", "", "", "", p.value, "", "", f"{totals_by_purpose.get(p.value, 0.0):.2f}", ""])
+
     return _pdf_simple_table(
         "fuel_entries.pdf",
         "Fuel Entries Report",
-        ["id", "vehicle", "driver", "trip", "fuel_date", "liters", "rate", "amount", "status"],
+        ["id", "slip_no", "vehicle", "driver", "trip", "fuel_date", "fuel_purpose", "liters", "rate", "amount", "status"],
         rows,
         subtitle=_subtitle(form),
         landscape_mode=True,
@@ -336,7 +378,7 @@ def fuel_pdf():
 @bp.get("/work-orders.csv")
 @login_required
 def work_orders_csv():
-    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose = _parse_date_range()
     q = WorkOrder.query
     if start_dt:
         q = q.filter(WorkOrder.opened_at >= start_dt)
@@ -367,7 +409,7 @@ def work_orders_csv():
 @bp.get("/work-orders.pdf")
 @login_required
 def work_orders_pdf():
-    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose = _parse_date_range()
     q = WorkOrder.query
     if start_dt:
         q = q.filter(WorkOrder.opened_at >= start_dt)
@@ -400,7 +442,7 @@ def work_orders_pdf():
 @bp.get("/preventive-schedules.csv")
 @login_required
 def preventive_schedules_csv():
-    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose = _parse_date_range()
     q = PreventiveSchedule.query
     if vehicle_id:
         q = q.filter(PreventiveSchedule.vehicle_id == vehicle_id)
@@ -428,7 +470,7 @@ def preventive_schedules_csv():
 @bp.get("/preventive-schedules.pdf")
 @login_required
 def preventive_schedules_pdf():
-    form, start_dt, end_dt, vehicle_id, driver_id = _parse_date_range()
+    form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose = _parse_date_range()
     q = PreventiveSchedule.query
     if vehicle_id:
         q = q.filter(PreventiveSchedule.vehicle_id == vehicle_id)
@@ -453,3 +495,6 @@ def preventive_schedules_pdf():
         subtitle=_subtitle(form),
         landscape_mode=True,
     )
+
+
+

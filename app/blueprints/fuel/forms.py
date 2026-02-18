@@ -2,7 +2,7 @@ from flask_wtf import FlaskForm
 from wtforms import SelectField, DecimalField, IntegerField, StringField, DateField, SubmitField, TextAreaField
 from wtforms.validators import DataRequired, Optional, NumberRange
 
-from ...models import FuelType
+from ...models import FuelPurpose
 
 
 class FuelEntryForm(FlaskForm):
@@ -18,9 +18,9 @@ class FuelEntryForm(FlaskForm):
     rate = DecimalField("Rate", validators=[Optional(), NumberRange(min=0)])
     amount = DecimalField("Amount", validators=[Optional(), NumberRange(min=0)])
 
-    fuel_type = SelectField(
-        "Fuel Type",
-        choices=[(s.value, s.name.title()) for s in FuelType],
+    fuel_purpose = SelectField(
+        "Fuel Purpose",
+        choices=[(s.value, s.name.replace("_", " ").title()) for s in FuelPurpose],
         validators=[DataRequired()],
     )
 

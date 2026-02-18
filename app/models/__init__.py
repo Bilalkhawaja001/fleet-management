@@ -4,7 +4,7 @@ from .driver import Driver
 from .trip import Trip, TripStatus, UsageType, ItemsOwner, ItemsReturnStatus
 from .trip_expense import TripExpense, TripExpenseType
 from .fuel_log import FuelLog
-from .fuel_entry import FuelEntry, FuelEntryStatus, FuelType
+from .fuel_entry import FuelEntry, FuelEntryStatus, FuelPurpose, FuelType
 from .vehicle_document import VehicleDocument, VehicleDocType, VehicleDocStatus
 from .vehicle_booking import VehicleBooking, BookingStatus
 from .notification import Notification, NotificationType, NotificationSeverity
@@ -28,6 +28,7 @@ __all__ = [
     "FuelLog",
     "FuelEntry",
     "FuelEntryStatus",
+    "FuelPurpose",
     "FuelType",
     "VehicleDocument",
     "VehicleDocType",

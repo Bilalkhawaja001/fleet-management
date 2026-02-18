@@ -1,12 +1,13 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
-from flask_login import login_required
+from flask_login import login_required, current_user
 
 from ...extensions import db
 from datetime import datetime
 
 from decimal import Decimal
 
-from ...models import FuelEntry, FuelEntryStatus, FuelType, Trip, UsageType, Vehicle, Driver, Role, User
+from sqlalchemy.orm import selectinload
+from ...models import FuelEntry, FuelEntryStatus, FuelPurpose, Trip, UsageType, Vehicle, Driver, Role, User
 from ...rbac import role_required
 from .forms import FuelEntryForm
 
@@ -25,38 +26,69 @@ def _choices(form: FuelEntryForm):
 @bp.get("/")
 @login_required
 def fuel_list():
-    q = FuelEntry.query
+    page = request.args.get("page", 1, type=int)
+    per_page = 25
+    
+    q = FuelEntry.query.options(
+        selectinload(FuelEntry.vehicle),
+        selectinload(FuelEntry.driver),
+        selectinload(FuelEntry.trip),
+        selectinload(FuelEntry.verified_by)
+    )
     status = (request.args.get("status") or "").strip()
     if status:
         try:
             q = q.filter(FuelEntry.status == FuelEntryStatus(status))
-        except Exception:
+        except ValueError:
             pass
 
-    entries = q.order_by(FuelEntry.id.desc()).all()
-    return render_template("fuel/fuel_list.html", entries=entries, filter_status=status)
+    fuel_purpose = (request.args.get("fuel_purpose") or "").strip()
+    if fuel_purpose:
+        try:
+            q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose))
+        except ValueError:
+            pass
+
+    pagination = q.order_by(FuelEntry.id.desc()).paginate(
+        page=page, per_page=per_page, error_out=False
+    )
+    entries = pagination.items
+    return render_template(
+        "fuel/fuel_list.html",
+        entries=entries,
+        pagination=pagination,
+        filter_status=status,
+        filter_fuel_purpose=fuel_purpose,
+    )
 
 
 @bp.route("/new", methods=["GET", "POST"])
 @login_required
 @role_required(Role.SUPER_ADMIN, Role.ADMIN, Role.ENTRY_OPERATOR)
 def fuel_create():
-    form = FuelEntryForm(fuel_type=FuelType.OFFICIAL.value)
+    form = FuelEntryForm(fuel_purpose=FuelPurpose.OFFICIAL.value)
     _choices(form)
 
     if form.validate_on_submit():
         trip_id = (form.trip_id.data or 0) or None
         share_pct = None
         company_amount = None
+        fuel_purpose = FuelPurpose(form.fuel_purpose.data)
         if trip_id:
             trip = db.session.get(Trip, trip_id)
             if trip and trip.usage_type:
                 if trip.usage_type in {UsageType.OFFICIAL, UsageType.MEDICAL_EMERGENCY}:
                     share_pct = 100
-                elif trip.usage_type in {UsageType.SCHOOL, UsageType.EDUCATIONAL}:
+                    fuel_purpose = FuelPurpose.OFFICIAL
+                elif trip.usage_type in {UsageType.SCHOOL}:
                     share_pct = 50
+                    fuel_purpose = FuelPurpose.SCHOOL_VAN
+                elif trip.usage_type in {UsageType.EDUCATIONAL}:
+                    share_pct = 50
+                    fuel_purpose = FuelPurpose.EDUCATION
                 elif trip.usage_type == UsageType.PERSONAL:
                     share_pct = 0
+                    fuel_purpose = FuelPurpose.PERSONAL
 
         # If linked to a trip (trip closure fuel), enforce liters+amount
         if trip_id and form.amount.data is None:
@@ -87,7 +119,7 @@ def fuel_create():
             amount=form.amount.data,
             company_share_pct=share_pct,
             company_amount=company_amount,
-            fuel_type=FuelType(form.fuel_type.data),
+            fuel_purpose=fuel_purpose,
             status=FuelEntryStatus.PENDING,
         )
         db.session.add(entry)
@@ -96,3 +128,45 @@ def fuel_create():
         return redirect(url_for("fuel.fuel_list"))
 
     return render_template("fuel/fuel_form.html", form=form, title="New Fuel Entry")
+
+
+@bp.route("/<int:id>/verify", methods=["POST"])
+@login_required
+@role_required(Role.SUPER_ADMIN, Role.ADMIN)
+def fuel_verify(id):
+    entry = db.session.get(FuelEntry, id)
+    if not entry:
+        flash("Fuel entry not found", "danger")
+        return redirect(url_for("fuel.fuel_list"))
+    
+    if entry.status != FuelEntryStatus.PENDING:
+        flash("Only pending entries can be verified", "danger")
+        return redirect(url_for("fuel.fuel_list"))
+    
+    entry.status = FuelEntryStatus.VERIFIED
+    entry.verified_by_user_id = current_user.id
+    entry.verified_at = datetime.utcnow()
+    db.session.commit()
+    flash("Fuel entry verified successfully", "success")
+    return redirect(url_for("fuel.fuel_list"))
+
+
+@bp.route("/<int:id>/reject", methods=["POST"])
+@login_required
+@role_required(Role.SUPER_ADMIN, Role.ADMIN)
+def fuel_reject(id):
+    entry = db.session.get(FuelEntry, id)
+    if not entry:
+        flash("Fuel entry not found", "danger")
+        return redirect(url_for("fuel.fuel_list"))
+    
+    if entry.status != FuelEntryStatus.PENDING:
+        flash("Only pending entries can be rejected", "danger")
+        return redirect(url_for("fuel.fuel_list"))
+    
+    entry.status = FuelEntryStatus.REJECTED
+    entry.verified_by_user_id = current_user.id
+    entry.verified_at = datetime.utcnow()
+    db.session.commit()
+    flash("Fuel entry rejected", "info")
+    return redirect(url_for("fuel.fuel_list"))

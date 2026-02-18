@@ -1,60 +1,180 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header %}
 {% block content %}
-<h3 class="mb-3">{{ title }}</h3>
-<form method="post">
-  {{ form.hidden_tag() }}
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      {{ form.vehicle_id.label(class_='form-label') }}
-      {{ form.vehicle_id(class_='form-select') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.driver_id.label(class_='form-label') }}
-      {{ form.driver_id(class_='form-select') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.trip_id.label(class_='form-label') }}
-      {{ form.trip_id(class_='form-select') }}
-    </div>
-  </div>
 
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      {{ form.slip_no.label(class_='form-label') }}
-      {{ form.slip_no(class_='form-control') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.fuel_date.label(class_='form-label') }}
-      {{ form.fuel_date(class_='form-control', type='date') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.fuel_type.label(class_='form-label') }}
-      {{ form.fuel_type(class_='form-select') }}
-    </div>
-  </div>
+{{ page_header(title, 'Fast, error-proof fuel log entry (append-only)') }}
 
-  <div class="row">
-    <div class="col-md-3 mb-3">
-      {{ form.odometer_at_fuel.label(class_='form-label') }}
-      {{ form.odometer_at_fuel(class_='form-control') }}
+<form method="post" class="card fm-card" id="fuelForm">
+  <div class="card-body">
+    {{ form.hidden_tag() }}
+
+    <div class="accordion" id="fuelAcc">
+
+      <!-- Core -->
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hCore">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cCore" aria-expanded="true" aria-controls="cCore">Core</button>
+        </h2>
+        <div id="cCore" class="accordion-collapse collapse show" aria-labelledby="hCore" data-bs-parent="#fuelAcc">
+          <div class="accordion-body">
+            <div class="row g-3">
+              <div class="col-md-3">
+                {{ form.fuel_date.label(class_='form-label') }}
+                {{ form.fuel_date(class_='form-control', type='date', required=True) }}
+              </div>
+              <div class="col-md-3">
+                {{ form.vehicle_id.label(class_='form-label') }}
+                {{ form.vehicle_id(class_='form-select', required=True) }}
+              </div>
+              <div class="col-md-3">
+                {{ form.driver_id.label(class_='form-label') }}
+                {{ form.driver_id(class_='form-select') }}
+              </div>
+              <div class="col-md-3">
+                {{ form.slip_no.label(class_='form-label') }}
+                {{ form.slip_no(class_='form-control fm-mono', id='slipNo', required=True, placeholder='SLIP-12345') }}
+                <div class="form-text">Auto upper-case for audit consistency.</div>
+              </div>
+
+              <div class="col-12">
+                {{ form.trip_id.label(class_='form-label') }}
+                {{ form.trip_id(class_='form-select') }}
+                <div class="form-text">Optional: link when fuel is part of a trip closure.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fuel details -->
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hDet">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cDet" aria-expanded="true" aria-controls="cDet">Fuel details</button>
+        </h2>
+        <div id="cDet" class="accordion-collapse collapse show" aria-labelledby="hDet" data-bs-parent="#fuelAcc">
+          <div class="accordion-body">
+            <div class="row g-3">
+              <div class="col-md-3">
+                {{ form.fuel_purpose.label(class_='form-label') }}
+                {{ form.fuel_purpose(class_='form-select') }}
+              </div>
+              <div class="col-md-3">
+                {{ form.liters.label(class_='form-label') }}
+                {{ form.liters(class_='form-control', id='qty', inputmode='decimal', min='0', step='0.01', required=True) }}
+              </div>
+              <div class="col-md-3">
+                {{ form.rate.label(class_='form-label') }}
+                {{ form.rate(class_='form-control', id='rate', inputmode='decimal', min='0', step='0.01', required=True) }}
+              </div>
+              <div class="col-md-3">
+                {{ form.amount.label(class_='form-label') }}
+                {{ form.amount(class_='form-control', id='amount', inputmode='decimal', min='0', step='0.01', readonly=True) }}
+                <div class="form-text">Auto-calculated: Qty × Rate (UI-only).</div>
+              </div>
+
+              <div class="col-md-3">
+                {{ form.odometer_at_fuel.label(class_='form-label') }}
+                {{ form.odometer_at_fuel(class_='form-control', inputmode='numeric', min='0') }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Station & Notes -->
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hStation">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cStation" aria-expanded="false" aria-controls="cStation">Station & Notes</button>
+        </h2>
+        <div id="cStation" class="accordion-collapse collapse" aria-labelledby="hStation" data-bs-parent="#fuelAcc">
+          <div class="accordion-body">
+            <div class="fm-muted">Station field not implemented in backend yet.</div>
+            <div class="mt-3">
+              {{ form.notes.label(class_='form-label') }}
+              {{ form.notes(class_='form-control', rows=3, placeholder='Optional notes for verification') }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Attachments -->
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hAtt">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cAtt" aria-expanded="false" aria-controls="cAtt">Attachments</button>
+        </h2>
+        <div id="cAtt" class="accordion-collapse collapse" aria-labelledby="hAtt" data-bs-parent="#fuelAcc">
+          <div class="accordion-body">
+            <div class="fm-muted">Not implemented (attachment upload endpoint not available).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Verification -->
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hVer">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cVer" aria-expanded="false" aria-controls="cVer">Verification</button>
+        </h2>
+        <div id="cVer" class="accordion-collapse collapse" aria-labelledby="hVer" data-bs-parent="#fuelAcc">
+          <div class="accordion-body">
+            <div class="fm-muted mb-2">Verification workflow is not implemented.</div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-secondary btn-sm" type="button" disabled>Verify (Not implemented)</button>
+              <button class="btn btn-outline-secondary btn-sm" type="button" disabled>Reject (Not implemented)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
-    <div class="col-md-3 mb-3">
-      {{ form.liters.label(class_='form-label') }}
-      {{ form.liters(class_='form-control') }}
+
+    <div class="d-flex gap-2 pt-3 justify-content-end">
+      {{ form.submit(class_='btn btn-primary') }}
+      <a class="btn btn-outline-secondary" href="{{ url_for('fuel.fuel_list') }}">Cancel</a>
     </div>
-    <div class="col-md-3 mb-3">
-      {{ form.rate.label(class_='form-label') }}
-      {{ form.rate(class_='form-control') }}
-    </div>
-    <div class="col-md-3 mb-3">
-      {{ form.amount.label(class_='form-label') }}
-      {{ form.amount(class_='form-control') }}
-    </div>
+
   </div>
-  <div class="mb-3">
-    {{ form.notes.label(class_='form-label') }}
-    {{ form.notes(class_='form-control', rows=3) }}
-  </div>
-  {{ form.submit(class_='btn btn-primary') }}
 </form>
+
+<script>
+  (function(){
+    const qty = document.getElementById('qty');
+    const rate = document.getElementById('rate');
+    const amount = document.getElementById('amount');
+    const slip = document.getElementById('slipNo');
+
+    function num(v){
+      const x = parseFloat(v);
+      return isNaN(x) ? null : x;
+    }
+
+    function clampNonNegative(inp){
+      if(!inp || inp.value === '') return;
+      const x = num(inp.value);
+      if(x === null) return;
+      if(x < 0) inp.value = '0';
+    }
+
+    function calc(){
+      clampNonNegative(qty);
+      clampNonNegative(rate);
+      const q = num(qty?.value);
+      const r = num(rate?.value);
+      if(q === null || r === null){
+        if(amount) amount.value = '';
+        return;
+      }
+      if(amount) amount.value = (q*r).toFixed(2);
+    }
+
+    qty?.addEventListener('input', calc);
+    rate?.addEventListener('input', calc);
+
+    slip?.addEventListener('input', function(){
+      slip.value = (slip.value || '').toUpperCase();
+    });
+
+    calc();
+  })();
+</script>
+
 {% endblock %}

@@ -1,46 +1,282 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header %}
 {% block content %}
-<h3 class="mb-3">Reports</h3>
 
-<form method="get" class="row g-2 align-items-end mb-3">
-  <div class="col-md-3">
-    {{ form.start_date.label(class_='form-label') }}
-    {{ form.start_date(class_='form-control') }}
+{{ page_header('Reports', 'Export audit-friendly reports (CSV/PDF) with applied filters') }}
+
+<div class="card fm-card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        {{ form.start_date.label(class_='form-label') }}
+        {{ form.start_date(class_='form-control') }}
+      </div>
+      <div class="col-md-3">
+        {{ form.end_date.label(class_='form-label') }}
+        {{ form.end_date(class_='form-control') }}
+      </div>
+      <div class="col-md-3">
+        {{ form.vehicle_id.label(class_='form-label') }}
+        {{ form.vehicle_id(class_='form-select') }}
+      </div>
+
+      <div class="col-md-3">
+        <label class="form-label" for="vehicle_category">Vehicle Category</label>
+        <select class="form-select" id="vehicle_category" name="vehicle_category">
+          <option value="">All</option>
+        </select>
+        <div id="vehicle_category_help" class="form-text" style="display:none;">Categories not loaded yet. Open Vehicles once.</div>
+      </div>
+
+      <div class="col-md-3">
+        {{ form.driver_id.label(class_='form-label') }}
+        {{ form.driver_id(class_='form-select') }}
+      </div>
+
+      <div class="col-md-3">
+        {{ form.fuel_purpose.label(class_='form-label') }}
+        {{ form.fuel_purpose(class_='form-select') }}
+      </div>
+
+      <div class="col-12 d-flex flex-column flex-md-row gap-2 justify-content-between align-items-start align-items-md-center">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Quick presets">
+          <button class="btn btn-outline-secondary" type="button" data-preset="today">Today</button>
+          <button class="btn btn-outline-secondary" type="button" data-preset="week">This Week</button>
+          <button class="btn btn-outline-secondary" type="button" data-preset="month">This Month</button>
+        </div>
+
+        <div class="d-flex gap-2">
+          {{ form.submit(class_='btn btn-primary') }}
+          <a class="btn btn-outline-secondary" href="{{ url_for('reports.index') }}">Reset</a>
+        </div>
+      </div>
+    </form>
+
+    <script>
+      (function(){
+        const start = document.querySelector('input[name="start_date"]');
+        const end = document.querySelector('input[name="end_date"]');
+        if(!start || !end) return;
+
+        function fmt(d){
+          const y = d.getFullYear();
+          const m = String(d.getMonth()+1).padStart(2,'0');
+          const day = String(d.getDate()).padStart(2,'0');
+          return `${y}-${m}-${day}`;
+        }
+
+        function setPreset(kind){
+          const now = new Date();
+          let s = new Date(now);
+          let e = new Date(now);
+
+          if(kind === 'today'){
+            // already today
+          }else if(kind === 'week'){
+            const dow = (now.getDay() + 6) % 7; // Monday=0
+            s.setDate(now.getDate() - dow);
+          }else if(kind === 'month'){
+            s = new Date(now.getFullYear(), now.getMonth(), 1);
+          }
+
+          start.value = fmt(s);
+          end.value = fmt(e);
+        }
+
+        document.querySelectorAll('[data-preset]').forEach(btn => {
+          btn.addEventListener('click', () => setPreset(btn.getAttribute('data-preset')));
+        });
+
+        // Vehicle Category (UI-only) - populated from localStorage cache created on Vehicles list page.
+        const KEY = 'fm.vehicleCategories.v1';
+        const TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+        const catSel = document.getElementById('vehicle_category');
+        const catHelp = document.getElementById('vehicle_category_help');
+        const vehSel = document.querySelector('select[name="vehicle_id"]');
+        const driverSel = document.querySelector('select[name="driver_id"]');
+        const purposeSel = document.querySelector('select[name="fuel_purpose"]');
+        const applyBtn = document.querySelector('button[type="submit"], input[type="submit"]');
+        if(!catSel || !vehSel) return;
+
+        function plateKey(s){
+          return (s || '').trim().toUpperCase();
+        }
+
+        function readCache(){
+          try{
+            const raw = localStorage.getItem(KEY);
+            if(!raw) return null;
+            const obj = JSON.parse(raw);
+            if(!obj || obj.v !== 1) return null;
+            if(!obj.ts || typeof obj.ts !== 'number') return null;
+            if(!obj.map || typeof obj.map !== 'object') return null;
+            if((Date.now() - obj.ts) > TTL) return null;
+            return obj;
+          }catch(e){ return null; }
+        }
+
+        function setCategoryDisabled(on){
+          catSel.disabled = !!on;
+          if(catHelp) catHelp.style.display = on ? 'block' : 'none';
+        }
+
+        function updateExportLinks(){
+          const qs = new URLSearchParams(window.location.search);
+
+          // Keep existing controls authoritative
+          qs.set('start_date', start.value || '');
+          qs.set('end_date', end.value || '');
+          qs.set('vehicle_id', vehSel.value || '0');
+          qs.set('driver_id', driverSel?.value || '0');
+          qs.set('fuel_purpose', purposeSel?.value || '');
+
+          const chosen = (catSel.value || '').trim();
+          if(chosen){
+            qs.set('vehicle_category', chosen);
+          } else {
+            qs.delete('vehicle_category');
+          }
+
+          document.querySelectorAll('a[data-export-link="1"]').forEach(a => {
+            const base = a.getAttribute('data-base-href');
+            if(!base) return;
+            const qstr = qs.toString();
+            a.setAttribute('href', qstr ? `${base}?${qstr}` : base);
+          });
+        }
+
+        function filterVehiclesByCategory(){
+          if(catSel.disabled) return;
+          const chosen = (catSel.value || '').trim();
+
+          Array.from(vehSel.options).forEach(opt => {
+            // keep All visible
+            if(opt.value === '0' || !chosen){
+              opt.hidden = false;
+              return;
+            }
+            const oc = opt.dataset.category || '';
+            opt.hidden = (oc !== chosen);
+          });
+
+          // if current selection hidden -> reset to All
+          const current = vehSel.options[vehSel.selectedIndex];
+          if(current && current.hidden){
+            vehSel.value = '0';
+          }
+        }
+
+        // Init from cache
+        const cache = readCache();
+        if(!cache){
+          setCategoryDisabled(true);
+          // still refresh export links without category
+          updateExportLinks();
+          return;
+        }
+
+        setCategoryDisabled(false);
+        const plateToCat = cache.map || {};
+
+        // Attach normalized categories to vehicle options + build category list
+        const cats = new Set();
+        Array.from(vehSel.options).forEach(opt => {
+          if(opt.value === '0') return;
+          const plateNorm = plateKey(opt.textContent || opt.value);
+          const c = plateToCat[plateNorm] || '';
+          opt.dataset.category = c;
+          if(c) cats.add(c);
+        });
+
+        Array.from(cats).sort().forEach(c => {
+          const o = document.createElement('option');
+          o.value = c;
+          o.textContent = c;
+          catSel.appendChild(o);
+        });
+
+        // Set from query string if present
+        const params = new URLSearchParams(window.location.search);
+        const initialCat = params.get('vehicle_category') || '';
+        if(initialCat) catSel.value = initialCat;
+
+        // Wire events
+        catSel.addEventListener('change', () => {
+          filterVehiclesByCategory();
+          updateExportLinks();
+        });
+        vehSel.addEventListener('change', updateExportLinks);
+        driverSel?.addEventListener('change', updateExportLinks);
+        purposeSel?.addEventListener('change', updateExportLinks);
+        start.addEventListener('change', updateExportLinks);
+        end.addEventListener('change', updateExportLinks);
+        applyBtn?.addEventListener('click', updateExportLinks);
+
+        // First run
+        filterVehiclesByCategory();
+        updateExportLinks();
+      })();
+    </script>
   </div>
-  <div class="col-md-3">
-    {{ form.end_date.label(class_='form-label') }}
-    {{ form.end_date(class_='form-control') }}
-  </div>
-  <div class="col-md-3">
-    {{ form.vehicle_id.label(class_='form-label') }}
-    {{ form.vehicle_id(class_='form-select') }}
-  </div>
-  <div class="col-md-3">
-    {{ form.driver_id.label(class_='form-label') }}
-    {{ form.driver_id(class_='form-select') }}
-  </div>
-  <div class="col-md-2">
-    {{ form.submit(class_='btn btn-primary') }}
-  </div>
-</form>
+</div>
 
 {% set qs = request.query_string.decode('utf-8') %}
-<ul>
-  <li>Trips:
-    <a href="{{ url_for('reports.trips_csv') }}{% if qs %}?{{ qs }}{% endif %}">CSV</a> |
-    <a href="{{ url_for('reports.trips_pdf') }}{% if qs %}?{{ qs }}{% endif %}">PDF</a>
-  </li>
-  <li>Fuel Logs:
-    <a href="{{ url_for('reports.fuel_csv') }}{% if qs %}?{{ qs }}{% endif %}">CSV</a> |
-    <a href="{{ url_for('reports.fuel_pdf') }}{% if qs %}?{{ qs }}{% endif %}">PDF</a>
-  </li>
-  <li>Work Orders:
-    <a href="{{ url_for('reports.work_orders_csv') }}{% if qs %}?{{ qs }}{% endif %}">CSV</a> |
-    <a href="{{ url_for('reports.work_orders_pdf') }}{% if qs %}?{{ qs }}{% endif %}">PDF</a>
-  </li>
-  <li>Preventive Schedules:
-    <a href="{{ url_for('reports.preventive_schedules_csv') }}{% if qs %}?{{ qs }}{% endif %}">CSV</a> |
-    <a href="{{ url_for('reports.preventive_schedules_pdf') }}{% if qs %}?{{ qs }}{% endif %}">PDF</a>
-  </li>
-</ul>
+<div class="card fm-card">
+  <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+    <span>Exports</span>
+    <span class="small fm-muted"><i class="bi bi-shield-check me-1"></i>Audit-friendly</span>
+  </div>
+  <div class="card-body">
+
+    <div class="fm-export-row d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+      <div>
+        <div class="fm-export-title">Trips</div>
+        <div class="fm-export-meta">Trip list with applied date/vehicle/driver filters</div>
+      </div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Trips exports">
+        <a class="btn btn-outline-primary" data-export-link="1" data-base-href="{{ url_for('reports.trips_csv') }}" href="{{ url_for('reports.trips_csv') }}{% if qs %}?{{ qs }}{% endif %}"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+        <a class="btn btn-outline-danger" data-export-link="1" data-base-href="{{ url_for('reports.trips_pdf') }}" href="{{ url_for('reports.trips_pdf') }}{% if qs %}?{{ qs }}{% endif %}"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+      </div>
+    </div>
+
+    <div class="fm-export-row d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+      <div>
+        <div class="fm-export-title">Fuel Logs</div>
+        <div class="fm-export-meta">Fuel consumption logs for selected scope</div>
+      </div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Fuel exports">
+        <a class="btn btn-outline-primary" data-export-link="1" data-base-href="{{ url_for('reports.fuel_csv') }}" href="{{ url_for('reports.fuel_csv') }}{% if qs %}?{{ qs }}{% endif %}"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+        <a class="btn btn-outline-danger" data-export-link="1" data-base-href="{{ url_for('reports.fuel_pdf') }}" href="{{ url_for('reports.fuel_pdf') }}{% if qs %}?{{ qs }}{% endif %}"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+      </div>
+    </div>
+
+    <div class="fm-export-row d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+      <div>
+        <div class="fm-export-title">Work Orders</div>
+        <div class="fm-export-meta">Maintenance work orders and status</div>
+      </div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Work orders exports">
+        <a class="btn btn-outline-primary" data-export-link="1" data-base-href="{{ url_for('reports.work_orders_csv') }}" href="{{ url_for('reports.work_orders_csv') }}{% if qs %}?{{ qs }}{% endif %}"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+        <a class="btn btn-outline-danger" data-export-link="1" data-base-href="{{ url_for('reports.work_orders_pdf') }}" href="{{ url_for('reports.work_orders_pdf') }}{% if qs %}?{{ qs }}{% endif %}"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+      </div>
+    </div>
+
+    <div class="fm-export-row d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+      <div>
+        <div class="fm-export-title">Preventive Schedules</div>
+        <div class="fm-export-meta">Preventive schedule plans and due items</div>
+      </div>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Preventive schedule exports">
+        <a class="btn btn-outline-primary" data-export-link="1" data-base-href="{{ url_for('reports.preventive_schedules_csv') }}" href="{{ url_for('reports.preventive_schedules_csv') }}{% if qs %}?{{ qs }}{% endif %}"><i class="bi bi-filetype-csv me-1"></i>CSV</a>
+        <a class="btn btn-outline-danger" data-export-link="1" data-base-href="{{ url_for('reports.preventive_schedules_pdf') }}" href="{{ url_for('reports.preventive_schedules_pdf') }}{% if qs %}?{{ qs }}{% endif %}"><i class="bi bi-filetype-pdf me-1"></i>PDF</a>
+      </div>
+    </div>
+
+    <div class="small fm-muted mt-3">
+      Tip: set filters above, then export. CSV is best for analysis; PDF is best for sharing.
+    </div>
+
+  </div>
+</div>
 {% endblock %}

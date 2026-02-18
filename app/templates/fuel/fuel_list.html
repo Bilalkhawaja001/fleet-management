@@ -1,44 +1,251 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, table_toolbar, badge, empty_state, chip %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-0">Fuel Entries</h3>
-    {% if filter_status %}<div class="text-muted" style="font-size: 0.9rem;">Filter: status={{ filter_status }}</div>{% endif %}
-  </div>
-  <div class="d-flex gap-2">
-    <a class="btn btn-sm btn-outline-secondary" href="/fuel/">All</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/fuel/?status=pending">Pending</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/fuel/?status=verified">Verified</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/fuel/?status=rejected">Rejected</a>
-    <a class="btn btn-sm btn-success" href="{{ url_for('fuel.fuel_create') }}">New</a>
+
+{{ page_header(
+  'Fuel Logs',
+  'Audit-first fuel entries (append-only). Verification is tracked per slip.',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('fuel.fuel_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Fuel Log</a>',
+  secondary=''
+    ~ '<button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Not implemented"><i class="bi bi-upload me-1"></i>Upload CSV</button>'
+) }}
+
+{{ table_toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:360px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input id="fuelQ" class="form-control" placeholder="Search slip / station / plate / driver / amount" autocomplete="off">'
+    ~ '</div>'
+    ~ '<input id="fuelFrom" class="form-control form-control-sm" type="date" style="max-width:155px;" title="From">'
+    ~ '<input id="fuelTo" class="form-control form-control-sm" type="date" style="max-width:155px;" title="To">'
+    ~ '<select id="fuelStatus" class="form-select form-select-sm" style="max-width:170px;">'
+    ~ '  <option value="">All Status</option>'
+    ~ '  <option value="pending">Pending</option>'
+    ~ '  <option value="verified">Verified</option>'
+    ~ '  <option value="rejected">Rejected</option>'
+    ~ '</select>'
+    ~ '<select id="fuelVehicle" class="form-select form-select-sm" style="max-width:170px;"><option value="">All Vehicles</option></select>'
+    ~ '<select id="fuelPurpose" class="form-select form-select-sm" style="max-width:170px;">'
+    ~ '  <option value="">All Purpose</option>'
+    ~ '  <option value="official">Official</option>'
+    ~ '  <option value="personal">Personal</option>'
+    ~ '  <option value="school_van">School Van</option>'
+    ~ '  <option value="education">Education</option>'
+    ~ '</select>',
+  right=''
+    ~ '<span class="fm-muted small">Append-only · no edit/delete</span>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if entries and entries|length %}
+      <div class="table-responsive">
+        <table id="fuelTable" class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th data-sort="slip" style="width:160px;">Slip No</th>
+              <th data-sort="date" style="width:120px;">Date</th>
+              <th data-sort="vehicle" style="width:120px;">Vehicle</th>
+              <th data-sort="driver" style="width:200px;">Driver</th>
+              <th data-sort="type" style="width:140px;">Fuel Purpose</th>
+              <th data-sort="qty" style="width:110px;" class="fm-num">Qty (L)</th>
+              <th data-sort="rate" style="width:110px;" class="fm-num">Rate</th>
+              <th data-sort="amount" style="width:120px;" class="fm-num">Amount</th>
+              <th data-sort="station" style="width:200px;">Station</th>
+              <th data-sort="status" style="width:140px;">Status</th>
+              <th data-sort="verby" style="width:180px;">Verified By</th>
+              <th class="fm-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in entries %}
+              {% set day = e.fuel_date.isoformat() if e.fuel_date else '' %}
+              {% set plate = e.vehicle.plate_no if e.vehicle else '' %}
+              {% set drv = e.driver.name if e.driver else '' %}
+              {% set verby = (e.verified_by.username if e.verified_by else '') %}
+              {% set station = '' %}
+              {% set rowcls = '' %}
+              {% if e.status.value == 'pending' %}{% set rowcls = 'fm-row-pending' %}{% endif %}
+              {% if e.status.value == 'verified' %}{% set rowcls = 'fm-row-verified' %}{% endif %}
+
+              <tr class="{{ rowcls }}"
+                data-slip="{{ (e.slip_no or '')|lower }}"
+                data-date="{{ day }}"
+                data-vehicle="{{ plate }}"
+                data-driver="{{ drv|lower }}"
+                data-amount="{{ e.amount or '' }}"
+                data-station="{{ station|lower }}"
+                data-status="{{ e.status.value }}"
+                data-verby="{{ verby|lower }}"
+                data-qty="{{ e.liters or '' }}"
+                data-rate="{{ e.rate or '' }}"
+                data-type="{{ e.fuel_purpose.value }}"
+              >
+                <td class="fm-mono fw-semibold">{{ e.slip_no }}</td>
+                <td>{{ day or '—' }}</td>
+                <td class="fw-semibold">{{ plate }}</td>
+                <td>{{ drv or '—' }}</td>
+                <td>{{ chip(e.fuel_purpose.value|replace('_',' ')|title, 'info') }}</td>
+                <td class="fm-num">{{ ('%.2f'|format(e.liters)) if e.liters is not none else '—' }}</td>
+                <td class="fm-num">{{ ('%.2f'|format(e.rate)) if e.rate is not none else '—' }}</td>
+                <td class="fm-num fw-semibold">{{ ('%.2f'|format(e.amount)) if e.amount is not none else '—' }}</td>
+                <td>{{ station or '—' }}</td>
+                <td>{{ badge(e.status.value) }}</td>
+                <td class="fm-muted">{{ verby or '—' }}</td>
+                <td class="fm-actions">
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Fuel actions">
+                    <button class="btn btn-outline-secondary btn-icon" type="button" disabled title="Not implemented"><i class="bi bi-eye"></i></button>
+                    {% if e.status.value == 'pending' %}
+                      <form method="POST" action="{{ url_for('fuel.fuel_verify', id=e.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to verify this fuel entry?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-outline-success btn-icon" title="Verify"><i class="bi bi-check2"></i></button>
+                      </form>
+                      <form method="POST" action="{{ url_for('fuel.fuel_reject', id=e.id) }}" style="display:inline;" onsubmit="return confirm('Are you sure you want to reject this fuel entry?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                        <button type="submit" class="btn btn-outline-danger btn-icon" title="Reject"><i class="bi bi-x-lg"></i></button>
+                      </form>
+                    {% else %}
+                      <button class="btn btn-outline-secondary btn-icon" type="button" disabled title="Already processed"><i class="bi bi-check2"></i></button>
+                      <button class="btn btn-outline-secondary btn-icon" type="button" disabled title="Already processed"><i class="bi bi-x-lg"></i></button>
+                    {% endif %}
+                    {% if current_user.role.value in ['super_admin','admin'] %}
+                      <button class="btn btn-outline-danger btn-icon" type="button" disabled title="Delete (Not implemented)"><i class="bi bi-trash"></i></button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+        (function(){
+          const table = document.getElementById('fuelTable');
+          if(!table) return;
+          const tbody = table.querySelector('tbody');
+
+          const q = document.getElementById('fuelQ');
+          const from = document.getElementById('fuelFrom');
+          const to = document.getElementById('fuelTo');
+          const st = document.getElementById('fuelStatus');
+          const veh = document.getElementById('fuelVehicle');
+          const purpose = document.getElementById('fuelPurpose');
+
+          // populate vehicles
+          const vehicles = new Set();
+          Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const v = (tr.dataset.vehicle || '').trim();
+            if(v) vehicles.add(v);
+          });
+          Array.from(vehicles).sort().forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o); });
+
+          function inRange(d){
+            if(!d) return true;
+            if(from?.value && d < from.value) return false;
+            if(to?.value && d > to.value) return false;
+            return true;
+          }
+
+          function apply(){
+            const term = (q?.value || '').trim().toLowerCase();
+            const status = (st?.value || '').trim();
+            const v = (veh?.value || '').trim();
+            const p = (purpose?.value || '').trim();
+
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+              const slip = tr.dataset.slip || '';
+              const plate = (tr.dataset.vehicle || '').toLowerCase();
+              const driver = tr.dataset.driver || '';
+              const amount = (tr.dataset.amount || '').toLowerCase();
+              const station = tr.dataset.station || '';
+              const date = tr.dataset.date || '';
+              const s = tr.dataset.status || '';
+
+              const matchTerm = !term || slip.includes(term) || station.includes(term) || plate.includes(term) || driver.includes(term) || amount.includes(term);
+              const matchStatus = !status || s === status;
+              const matchVeh = !v || (tr.dataset.vehicle || '') === v;
+              const matchPurpose = !p || (tr.dataset.type || '') === p;
+              const matchDate = inRange(date);
+
+              tr.style.display = (matchTerm && matchStatus && matchVeh && matchPurpose && matchDate) ? '' : 'none';
+            });
+          }
+
+          q?.addEventListener('input', apply);
+          from?.addEventListener('change', apply);
+          to?.addEventListener('change', apply);
+          st?.addEventListener('change', apply);
+          veh?.addEventListener('change', apply);
+          purpose?.addEventListener('change', apply);
+
+          // sorting
+          let sortKey=null, sortDir=1;
+          function getVal(tr,key){
+            const d = tr.dataset;
+            if(key==='slip') return d.slip||'';
+            if(key==='date') return d.date||'9999-12-31';
+            if(key==='vehicle') return d.vehicle||'';
+            if(key==='driver') return d.driver||'';
+            if(key==='type') return d.type||'';
+            if(key==='qty') return (d.qty||'').padStart(20,'0');
+            if(key==='rate') return (d.rate||'').padStart(20,'0');
+            if(key==='amount') return (d.amount||'').padStart(20,'0');
+            if(key==='station') return d.station||'';
+            if(key==='status') return d.status||'';
+            if(key==='verby') return d.verby||'';
+            return '';
+          }
+          table.querySelectorAll('thead th[data-sort]').forEach(th => {
+            th.style.cursor='pointer';
+            th.addEventListener('click', () => {
+              const key = th.getAttribute('data-sort');
+              if(sortKey===key) sortDir=-sortDir; else { sortKey=key; sortDir=1; }
+              const rows = Array.from(tbody.querySelectorAll('tr'));
+              rows.sort((a,b)=> getVal(a,key).localeCompare(getVal(b,key))*sortDir);
+              rows.forEach(r=>tbody.appendChild(r));
+            });
+          });
+        })();
+      </script>
+
+    {% else %}
+      {{ empty_state('bi-fuel-pump', 'No fuel logs yet', 'Add the first fuel slip to start tracking spend and verification.', 'New Fuel Log', url_for('fuel.fuel_create')) }}
+    {% endif %}
+
+    {% if pagination and pagination.pages > 1 %}
+    <div class="card-footer">
+      <nav aria-label="Page navigation">
+        <ul class="pagination justify-content-center">
+          {% if pagination.has_prev %}
+            <li class="page-item">
+              <a class="page-link" href="{{ url_for('fuel.fuel_list', page=pagination.prev_num, status=request.args.get('status'), fuel_purpose=request.args.get('fuel_purpose')) }}">Previous</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled">
+              <span class="page-link">Previous</span>
+            </li>
+          {% endif %}
+          
+          <li class="page-item active">
+            <span class="page-link">{{ pagination.page }} of {{ pagination.pages }}</span>
+          </li>
+          
+          {% if pagination.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="{{ url_for('fuel.fuel_list', page=pagination.next_num, status=request.args.get('status'), fuel_purpose=request.args.get('fuel_purpose')) }}">Next</a>
+            </li>
+          {% else %}
+            <li class="page-item disabled">
+              <span class="page-link">Next</span>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+    {% endif %}
+
   </div>
 </div>
-<p class="text-muted">Entries are append-only (no edit/delete). Verification will be added next.</p>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Slip</th><th>Date</th><th>Vehicle</th><th>Driver</th><th>Trip</th><th>Liters</th><th>Rate</th><th>Amount</th><th>Company %</th><th>Company Amt</th><th>Odometer</th><th>Type</th><th>Status</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for e in entries %}
-      <tr>
-        <td>{{ e.id }}</td>
-        <td>{{ e.slip_no }}</td>
-        <td>{{ e.fuel_date }}</td>
-        <td>{{ e.vehicle.plate_no }}</td>
-        <td>{{ e.driver.name if e.driver else '' }}</td>
-        <td>{{ e.trip_id or '' }}</td>
-        <td>{{ e.liters }}</td>
-        <td>{{ e.rate or '' }}</td>
-        <td>{{ e.amount or '' }}</td>
-        <td>{{ e.company_share_pct if e.company_share_pct is not none else '' }}</td>
-        <td>{{ e.company_amount or '' }}</td>
-        <td>{{ e.odometer_at_fuel or '' }}</td>
-        <td>{{ e.fuel_type.value }}</td>
-        <td>{{ e.status.value }}</td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
 {% endblock %}

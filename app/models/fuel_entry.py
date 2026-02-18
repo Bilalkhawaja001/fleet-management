@@ -1,12 +1,18 @@
 import enum
-from datetime import datetime, date
+from datetime import datetime
 
 from ..extensions import db
 
 
-class FuelType(str, enum.Enum):
+class FuelPurpose(str, enum.Enum):
     OFFICIAL = "official"
     PERSONAL = "personal"
+    SCHOOL_VAN = "school_van"
+    EDUCATION = "education"
+
+
+# Backward-compat alias for older imports
+FuelType = FuelPurpose
 
 
 class FuelEntryStatus(str, enum.Enum):
@@ -37,7 +43,7 @@ class FuelEntry(db.Model):
     company_share_pct = db.Column(db.Integer, nullable=True)  # 0/50/100
     company_amount = db.Column(db.Numeric(12, 2), nullable=True)
 
-    fuel_type = db.Column(db.Enum(FuelType), nullable=False, default=FuelType.OFFICIAL, index=True)
+    fuel_purpose = db.Column(db.Enum(FuelPurpose), nullable=False, default=FuelPurpose.OFFICIAL, index=True)
 
     status = db.Column(db.Enum(FuelEntryStatus), nullable=False, default=FuelEntryStatus.PENDING, index=True)
     verified_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
@@ -50,6 +56,7 @@ class FuelEntry(db.Model):
 
     __table_args__ = (
         db.Index("ix_fuel_entries_status_date", "status", "fuel_date"),
+        db.Index("ix_fuel_entries_purpose_date", "fuel_purpose", "fuel_date"),
     )
 
     vehicle = db.relationship("Vehicle", backref=db.backref("fuel_entries", lazy=True))
