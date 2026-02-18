@@ -71,10 +71,36 @@ python -m compileall -q app
 ```
 Result: ✅ success
 
+## P2 Follow-up (Executed after approval)
+- Added password complexity policy enforcement in `User.set_password()`:
+  - min length 8
+  - at least 1 uppercase, 1 lowercase, 1 digit
+- Added graceful handling in user create/edit routes for weak password errors.
+- Added stronger input validation rules for:
+  - `VehicleForm`
+  - `DriverForm`
+  - `UserCreateForm` / `UserEditForm`
+- Replaced broad `except Exception` in trip filters with targeted `ValueError` handling.
+
+### Additional tests
+- `tests/test_user_password_policy.py`
+
+### Re-run results after P2
+```bash
+pytest -q
+```
+Result: ✅ `5 passed in 3.12s`
+
+```bash
+python -m compileall -q app
+```
+Result: ✅ success
+
 ## Outcome Summary
 - P0 requested items implemented and validated.
 - P1 requested items implemented and validated.
+- P2 initial hardening pass implemented and validated.
 - Functional verification completed with passing tests + migration applied.
 
 ## Notes
-- Repo had pre-existing broad modifications unrelated to this run; this report only covers the files touched for requested P0/P1 scope.
+- Repo had pre-existing broad modifications unrelated to this run; this report only covers the files touched for requested scope in this execution window.

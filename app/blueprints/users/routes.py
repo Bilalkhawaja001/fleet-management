@@ -27,7 +27,12 @@ def user_create():
             flash("Username already exists", "warning")
         else:
             u = User(username=form.username.data.strip(), role=Role(form.role.data), is_active=form.is_active.data)
-            u.set_password(form.password.data)
+            try:
+                u.set_password(form.password.data)
+            except ValueError as exc:
+                flash(str(exc), "danger")
+                return render_template("users/user_form.html", form=form, title="New User")
+
             db.session.add(u)
             db.session.commit()
             flash("User created", "success")
@@ -51,7 +56,11 @@ def user_edit(user_id: int):
         u.role = Role(form.role.data)
         u.is_active = form.is_active.data
         if form.password.data:
-            u.set_password(form.password.data)
+            try:
+                u.set_password(form.password.data)
+            except ValueError as exc:
+                flash(str(exc), "danger")
+                return render_template("users/user_form.html", form=form, title=f"Edit User #{u.id}")
         db.session.commit()
         flash("User updated", "success")
         return redirect(url_for("users.user_list"))

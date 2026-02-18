@@ -1,4 +1,5 @@
 import enum
+import re
 from datetime import datetime
 
 from flask_login import UserMixin
@@ -25,6 +26,15 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     def set_password(self, password: str) -> None:
+        if not password or len(password) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        if not re.search(r"[A-Z]", password):
+            raise ValueError("Password must include at least one uppercase letter")
+        if not re.search(r"[a-z]", password):
+            raise ValueError("Password must include at least one lowercase letter")
+        if not re.search(r"\d", password):
+            raise ValueError("Password must include at least one digit")
+
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password: str) -> bool:
