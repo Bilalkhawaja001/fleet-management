@@ -5,7 +5,10 @@ from ..extensions import db
 
 
 class TripExpenseType(str, enum.Enum):
+    FUEL = "fuel"
     TOLL = "toll"
+    PARKING = "parking"
+    REPAIR = "repair"
     OTHER = "other"
 
 

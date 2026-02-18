@@ -1,137 +1,76 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header %}
 {% block content %}
-<h3 class="mb-3">{{ title }}</h3>
-<form method="post">
-  {{ form.hidden_tag() }}
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      {{ form.vehicle_id.label(class_='form-label') }}
-      {{ form.vehicle_id(class_='form-select') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.driver_id.label(class_='form-label') }}
-      {{ form.driver_id(class_='form-select') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.status.label(class_='form-label') }}
-      {{ form.status(class_='form-select') }}
-    </div>
-  </div>
 
-  <div class="row">
-    <div class="col-md-3 mb-3">
-      {{ form.odometer_start.label(class_='form-label') }}
-      {{ form.odometer_start(class_='form-control', type='number') }}
-    </div>
-    <div class="col-md-3 mb-3">
-      {{ form.odometer_end.label(class_='form-label') }}
-      {{ form.odometer_end(class_='form-control', type='number') }}
-    </div>
-    <div class="col-md-3 mb-3">
-      {{ form.time_out.label(class_='form-label') }}
-      {{ form.time_out(class_='form-control', type='datetime-local') }}
-    </div>
-    <div class="col-md-3 mb-3">
-      {{ form.time_in.label(class_='form-label') }}
-      {{ form.time_in(class_='form-control', type='datetime-local') }}
-    </div>
-  </div>
+{{ page_header(title, 'Quick Trip entry') }}
 
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      {{ form.usage_type.label(class_='form-label') }}
-      {{ form.usage_type(class_='form-select') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.department.label(class_='form-label') }}
-      {{ form.department(class_='form-control') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.employee_name.label(class_='form-label') }}
-      {{ form.employee_name(class_='form-control') }}
-    </div>
-  </div>
+<div class="row justify-content-center">
+  <div class="col-12 col-xl-9">
+    <form method="post" class="card fm-card" id="tripForm">
+      <div class="card-body">
+        {{ form.hidden_tag() }}
 
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      {{ form.origin.label(class_='form-label') }}
-      {{ form.origin(class_='form-control') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.destination_city.label(class_='form-label') }}
-      {{ form.destination_city(class_='form-select') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.destination.label(class_='form-label') }}
-      {{ form.destination(class_='form-control') }}
-    </div>
-  </div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            {{ form.usage_type.label(class_='form-label') }}
+            {{ form.usage_type(class_='form-select') }}
+          </div>
+          <div class="col-md-4">
+            {{ form.department.label(class_='form-label') }}
+            {{ form.department(class_='form-control') }}
+          </div>
+          <div class="col-md-4">
+            {{ form.employee_name.label(class_='form-label') }}
+            {{ form.employee_name(class_='form-control') }}
+          </div>
 
-  <div class="card mb-3">
-    <div class="card-header">
-      <div class="form-check">
-        {{ form.carrying_items(class_='form-check-input', id='carrying_items_cb') }}
-        {{ form.carrying_items.label(class_='form-check-label', for='carrying_items_cb') }}
-      </div>
-    </div>
-    <div class="card-body" id="items_section">
-      <div class="row">
-        <div class="col-md-4 mb-3">
-          {{ form.items_owner.label(class_='form-label') }}
-          {{ form.items_owner(class_='form-select') }}
+          <div class="col-md-4">
+            {{ form.origin.label(class_='form-label') }}
+            {{ form.origin(class_='form-control') }}
+          </div>
+          <div class="col-md-4">
+            {{ form.destination_city.label(class_='form-label') }}
+            {{ form.destination_city(class_='form-select') }}
+          </div>
+          <div class="col-md-4">
+            {{ form.destination.label(class_='form-label') }}
+            {{ form.destination(class_='form-control') }}
+          </div>
+
+          <div class="col-md-4">
+            {{ form.time_out.label(class_='form-label') }}
+            {{ form.time_out(class_='form-control', type='datetime-local') }}
+          </div>
+          <div class="col-md-4">
+            {{ form.vehicle_id.label(class_='form-label') }}
+            {{ form.vehicle_id(class_='form-select') }}
+          </div>
+          <div class="col-md-4">
+            {{ form.driver_id.label(class_='form-label') }}
+            {{ form.driver_id(class_='form-select') }}
+          </div>
+
+          <div class="col-md-4">
+            {{ form.odometer_start.label(class_='form-label') }}
+            {{ form.odometer_start(class_='form-control', type='number', min='0') }}
+          </div>
+          <div class="col-md-4">
+            {{ form.status.label(class_='form-label') }}
+            {{ form.status(class_='form-select') }}
+          </div>
+          <div class="col-12">
+            {{ form.notes.label(class_='form-label') }}
+            {{ form.notes(class_='form-control', rows=3) }}
+          </div>
         </div>
-        <div class="col-md-4 mb-3">
-          {{ form.gatepass_no.label(class_='form-label') }}
-          {{ form.gatepass_no(class_='form-control') }}
-        </div>
-        <div class="col-md-4 mb-3">
-          {{ form.items_reason.label(class_='form-label') }}
-          {{ form.items_reason(class_='form-control') }}
+
+        <div class="d-flex gap-2 pt-3 justify-content-end">
+          {{ form.submit(class_='btn btn-primary') }}
+          <a class="btn btn-outline-secondary" href="{{ url_for('trips.trip_list') }}">Back</a>
         </div>
       </div>
-      <div class="mb-3">
-        {{ form.items_details.label(class_='form-label') }}
-        {{ form.items_details(class_='form-control', rows=3) }}
-      </div>
-      <hr />
-      <div class="row">
-        <div class="col-md-4 mb-3">
-          {{ form.items_return_status.label(class_='form-label') }}
-          {{ form.items_return_status(class_='form-select') }}
-        </div>
-        <div class="col-md-4 mb-3">
-          {{ form.items_expected_return_date.label(class_='form-label') }}
-          {{ form.items_expected_return_date(class_='form-control', type='date') }}
-        </div>
-      </div>
-      <div class="mb-3">
-        {{ form.items_not_returned_reason.label(class_='form-label') }}
-        {{ form.items_not_returned_reason(class_='form-control', rows=2) }}
-      </div>
-    </div>
+    </form>
   </div>
+</div>
 
-  <div class="mb-3">
-    {{ form.notes.label(class_='form-label') }}
-    {{ form.notes(class_='form-control', rows=3) }}
-  </div>
-
-  {{ form.submit(class_='btn btn-primary') }}
-
-  <script>
-    (function() {
-      function toggleItems() {
-        var cb = document.getElementById('carrying_items_cb');
-        var sec = document.getElementById('items_section');
-        if (!cb || !sec) return;
-        sec.style.display = cb.checked ? 'block' : 'none';
-      }
-      document.addEventListener('DOMContentLoaded', function() {
-        var cb = document.getElementById('carrying_items_cb');
-        if (cb) cb.addEventListener('change', toggleItems);
-        toggleItems();
-      });
-    })();
-  </script>
-</form>
 {% endblock %}

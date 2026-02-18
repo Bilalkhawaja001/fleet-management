@@ -1,5 +1,5 @@
 import enum
-from datetime import datetime, date
+from datetime import datetime
 
 from ..extensions import db
 
@@ -14,9 +14,8 @@ class TripStatus(str, enum.Enum):
 class UsageType(str, enum.Enum):
     OFFICIAL = "official"
     PERSONAL = "personal"
-    MEDICAL_EMERGENCY = "medical_emergency"
-    SCHOOL = "school"
-    EDUCATIONAL = "educational"
+    SCHOOL_VAN = "school_van"
+    EDUCATION = "education"
 
 
 class ItemsOwner(str, enum.Enum):
@@ -38,11 +37,15 @@ class Trip(db.Model):
     vehicle_id = db.Column(db.Integer, db.ForeignKey("vehicles.id"), nullable=True, index=True)
     driver_id = db.Column(db.Integer, db.ForeignKey("drivers.id"), nullable=True, index=True)
 
-    # Trip closure (captured at trip end; can be entered later, but required to close a trip)
     odometer_start = db.Column(db.Integer, nullable=True)
     odometer_end = db.Column(db.Integer, nullable=True)
     time_out = db.Column(db.DateTime, nullable=True)
     time_in = db.Column(db.DateTime, nullable=True)
+
+    # Explicit fields used by End Trip workflow
+    end_odometer = db.Column(db.Integer, nullable=True)
+    end_time = db.Column(db.DateTime, nullable=True)
+    running_km = db.Column(db.Integer, nullable=True)
 
     usage_type = db.Column(db.Enum(UsageType), nullable=False, default=UsageType.OFFICIAL)
     department = db.Column(db.String(120), nullable=True)
@@ -63,7 +66,6 @@ class Trip(db.Model):
     items_expected_return_date = db.Column(db.Date, nullable=True)
 
     status = db.Column(db.Enum(TripStatus), nullable=False, default=TripStatus.PLANNED)
-    # legacy timestamps (kept for backward compatibility; prefer time_out/time_in)
     start_at = db.Column(db.DateTime, nullable=True)
     end_at = db.Column(db.DateTime, nullable=True)
 
@@ -80,13 +82,17 @@ class Trip(db.Model):
 
     @property
     def distance_km(self):
-        if self.odometer_start is None or self.odometer_end is None:
+        if self.running_km is not None:
+            return self.running_km
+
+        start = self.odometer_start
+        end = self.end_odometer if self.end_odometer is not None else self.odometer_end
+        if start is None or end is None:
             return None
-        return max(0, int(self.odometer_end) - int(self.odometer_start))
+        return max(0, int(end) - int(start))
 
     @property
     def toll_amount(self):
-        # Sum of toll expenses
         if not getattr(self, "expenses", None):
             return 0
         return sum([float(e.amount) for e in self.expenses if getattr(e.expense_type, "value", e.expense_type) == "toll"])

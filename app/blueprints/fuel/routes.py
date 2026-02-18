@@ -77,13 +77,13 @@ def fuel_create():
         if trip_id:
             trip = db.session.get(Trip, trip_id)
             if trip and trip.usage_type:
-                if trip.usage_type in {UsageType.OFFICIAL, UsageType.MEDICAL_EMERGENCY}:
+                if trip.usage_type == UsageType.OFFICIAL:
                     share_pct = 100
                     fuel_purpose = FuelPurpose.OFFICIAL
-                elif trip.usage_type in {UsageType.SCHOOL}:
+                elif trip.usage_type == UsageType.SCHOOL_VAN:
                     share_pct = 50
                     fuel_purpose = FuelPurpose.SCHOOL_VAN
-                elif trip.usage_type in {UsageType.EDUCATIONAL}:
+                elif trip.usage_type == UsageType.EDUCATION:
                     share_pct = 50
                     fuel_purpose = FuelPurpose.EDUCATION
                 elif trip.usage_type == UsageType.PERSONAL:

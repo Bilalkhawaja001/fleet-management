@@ -1,23 +1,28 @@
-from datetime import datetime, date, time
+from datetime import date, datetime, time
+from decimal import Decimal
 
-from flask import Blueprint, render_template, redirect, url_for, flash, request
+from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from ...extensions import db
-from ...models import FuelEntry, TripExpense, TripExpenseType, ItemsOwner, ItemsReturnStatus, Trip, TripStatus, UsageType, Vehicle, Driver, Role
+from ...models import FuelEntry, Role, Trip, TripExpense, TripExpenseType, TripStatus, UsageType, Vehicle, Driver
 from ...rbac import role_required
-from .forms import TripForm
 from .expense_forms import TripExpenseForm
+from .forms import EndTripForm, TripForm
 
 bp = Blueprint("trips", __name__, url_prefix="/trips")
 
 
 def _fill_choices(form: TripForm):
-    form.vehicle_id.choices = [(0, "--")]
+    form.vehicle_id.choices = [(0, "-- Select Vehicle --")]
     form.vehicle_id.choices += [(v.id, f"{v.plate_no} - {v.make_model}") for v in Vehicle.query.order_by(Vehicle.plate_no).all()]
 
-    form.driver_id.choices = [(0, "--")]
+    form.driver_id.choices = [(0, "-- Select Driver --")]
     form.driver_id.choices += [(d.id, d.name) for d in Driver.query.order_by(Driver.name).all()]
+
+
+def _editable_statuses():
+    return {TripStatus.PLANNED, TripStatus.ASSIGNED, TripStatus.IN_TRANSIT}
 
 
 @bp.get("/")
@@ -25,7 +30,6 @@ def _fill_choices(form: TripForm):
 def trip_list():
     q = Trip.query
 
-    # Filters
     status = (request.args.get("status") or "").strip()
     if status:
         try:
@@ -33,7 +37,7 @@ def trip_list():
         except ValueError:
             flash("Invalid status filter ignored", "warning")
 
-    day = (request.args.get("date") or "").strip()  # YYYY-MM-DD
+    day = (request.args.get("date") or "").strip()
     if day:
         try:
             d = date.fromisoformat(day)
@@ -44,79 +48,46 @@ def trip_list():
             flash("Invalid date filter ignored", "warning")
 
     trips = q.order_by(Trip.id.desc()).all()
-    return render_template(
-        "trips/trips_list.html",
-        trips=trips,
-        filter_status=status,
-        filter_date=day,
-    )
+    end_form = EndTripForm()
+    end_form.set_default_now()
+    return render_template("trips/trips_list.html", trips=trips, filter_status=status, filter_date=day, end_form=end_form)
 
 
 @bp.route("/new", methods=["GET", "POST"])
 @login_required
 @role_required(Role.SUPER_ADMIN, Role.ADMIN, Role.ENTRY_OPERATOR)
 def trip_create():
-    form = TripForm(status=TripStatus.PLANNED.value)
+    form = TripForm(status=TripStatus.PLANNED.value, usage_type=UsageType.OFFICIAL.value)
     _fill_choices(form)
 
     if form.validate_on_submit():
-        # Minimal conditional validation for items flow
-        if form.carrying_items.data:
-            if not (form.gatepass_no.data or "").strip():
-                flash("Gatepass No is required when carrying items", "danger")
-                return render_template("trips/trip_form.html", form=form, title="New Trip", trip=None)
-            if not (form.items_reason.data or "").strip():
-                flash("Items reason is required when carrying items", "danger")
-                return render_template("trips/trip_form.html", form=form, title="New Trip", trip=None)
-            if not (form.items_details.data or "").strip():
-                flash("Items details are required when carrying items", "danger")
-                return render_template("trips/trip_form.html", form=form, title="New Trip", trip=None)
-
-        # Trip completion requires closure fields
-        if TripStatus(form.status.data) == TripStatus.COMPLETED:
-            if form.odometer_start.data is None or form.odometer_end.data is None:
-                flash("Start/End odometer are required to complete a trip", "danger")
-                return render_template("trips/trip_form.html", form=form, title="New Trip", trip=None)
-            if form.time_out.data is None or form.time_in.data is None:
-                flash("Time Out/Time In are required to complete a trip", "danger")
-                return render_template("trips/trip_form.html", form=form, title="New Trip", trip=None)
-            if form.odometer_end.data < form.odometer_start.data:
-                flash("End odometer must be >= start odometer", "danger")
-                return render_template("trips/trip_form.html", form=form, title="New Trip", trip=None)
-            if form.time_in.data < form.time_out.data:
-                flash("Time In must be >= Time Out", "danger")
-                return render_template("trips/trip_form.html", form=form, title="New Trip", trip=None)
+        if (form.vehicle_id.data or 0) == 0:
+            flash("Vehicle is required", "danger")
+            return render_template("trips/trip_form.html", form=form, title="Quick Trip")
+        if (form.driver_id.data or 0) == 0:
+            flash("Driver is required", "danger")
+            return render_template("trips/trip_form.html", form=form, title="Quick Trip")
 
         t = Trip(
-            vehicle_id=(form.vehicle_id.data or 0) or None,
-            driver_id=(form.driver_id.data or 0) or None,
+            vehicle_id=form.vehicle_id.data,
+            driver_id=form.driver_id.data,
             odometer_start=form.odometer_start.data,
-            odometer_end=form.odometer_end.data,
             time_out=form.time_out.data,
-            time_in=form.time_in.data,
             usage_type=UsageType(form.usage_type.data),
-            department=(form.department.data or "").strip() or None,
-            employee_name=(form.employee_name.data or "").strip() or None,
-            origin=(form.origin.data or "").strip() or None,
-            destination_city=(form.destination_city.data or "").strip() or None,
-            destination=(form.destination.data or "").strip() or None,
+            department=(form.department.data or "").strip(),
+            employee_name=(form.employee_name.data or "").strip(),
+            origin=(form.origin.data or "").strip(),
+            destination_city=(form.destination_city.data or "").strip(),
+            destination=(form.destination.data or "").strip(),
             status=TripStatus(form.status.data),
-            carrying_items=bool(form.carrying_items.data),
-            items_owner=ItemsOwner(form.items_owner.data) if form.items_owner.data else None,
-            gatepass_no=(form.gatepass_no.data or "").strip() or None,
-            items_reason=(form.items_reason.data or "").strip() or None,
-            items_details=(form.items_details.data or "").strip() or None,
-            items_return_status=ItemsReturnStatus(form.items_return_status.data) if form.items_return_status.data else None,
-            items_not_returned_reason=(form.items_not_returned_reason.data or "").strip() or None,
-            items_expected_return_date=form.items_expected_return_date.data,
             notes=(form.notes.data or "").strip() or None,
         )
         db.session.add(t)
         db.session.commit()
-        flash("Trip created", "success")
+        flash("Trip saved", "success")
         return redirect(url_for("trips.trip_list"))
 
-    return render_template("trips/trip_form.html", form=form, title="New Trip", trip=None)
+    return render_template("trips/trip_form.html", form=form, title="Quick Trip")
 
 
 @bp.route("/<int:trip_id>/edit", methods=["GET", "POST"])
@@ -132,9 +103,7 @@ def trip_edit(trip_id: int):
         vehicle_id=t.vehicle_id or 0,
         driver_id=t.driver_id or 0,
         odometer_start=t.odometer_start,
-        odometer_end=t.odometer_end,
         time_out=t.time_out,
-        time_in=t.time_in,
         usage_type=t.usage_type.value if t.usage_type else UsageType.OFFICIAL.value,
         department=t.department,
         employee_name=t.employee_name,
@@ -142,72 +111,150 @@ def trip_edit(trip_id: int):
         destination_city=t.destination_city,
         destination=t.destination,
         status=t.status.value,
-        carrying_items=t.carrying_items,
-        items_owner=t.items_owner.value if t.items_owner else "",
-        gatepass_no=t.gatepass_no,
-        items_reason=t.items_reason,
-        items_details=t.items_details,
-        items_return_status=t.items_return_status.value if t.items_return_status else "",
-        items_not_returned_reason=t.items_not_returned_reason,
-        items_expected_return_date=t.items_expected_return_date,
         notes=t.notes,
     )
     _fill_choices(form)
 
     if form.validate_on_submit():
-        if form.carrying_items.data:
-            if not (form.gatepass_no.data or "").strip():
-                flash("Gatepass No is required when carrying items", "danger")
-                return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}", trip=t)
-            if not (form.items_reason.data or "").strip():
-                flash("Items reason is required when carrying items", "danger")
-                return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}", trip=t)
-            if not (form.items_details.data or "").strip():
-                flash("Items details are required when carrying items", "danger")
-                return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}", trip=t)
+        if (form.vehicle_id.data or 0) == 0:
+            flash("Vehicle is required", "danger")
+            return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
+        if (form.driver_id.data or 0) == 0:
+            flash("Driver is required", "danger")
+            return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
 
-        # Trip completion requires closure fields
-        if TripStatus(form.status.data) == TripStatus.COMPLETED:
-            if form.odometer_start.data is None or form.odometer_end.data is None:
-                flash("Start/End odometer are required to complete a trip", "danger")
-                return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}", trip=t)
-            if form.time_out.data is None or form.time_in.data is None:
-                flash("Time Out/Time In are required to complete a trip", "danger")
-                return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}", trip=t)
-            if form.odometer_end.data < form.odometer_start.data:
-                flash("End odometer must be >= start odometer", "danger")
-                return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}", trip=t)
-            if form.time_in.data < form.time_out.data:
-                flash("Time In must be >= Time Out", "danger")
-                return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}", trip=t)
-
-        t.vehicle_id = (form.vehicle_id.data or 0) or None
-        t.driver_id = (form.driver_id.data or 0) or None
+        t.vehicle_id = form.vehicle_id.data
+        t.driver_id = form.driver_id.data
         t.odometer_start = form.odometer_start.data
-        t.odometer_end = form.odometer_end.data
         t.time_out = form.time_out.data
-        t.time_in = form.time_in.data
         t.usage_type = UsageType(form.usage_type.data)
-        t.department = (form.department.data or "").strip() or None
-        t.employee_name = (form.employee_name.data or "").strip() or None
-        t.origin = (form.origin.data or "").strip() or None
-        t.destination_city = (form.destination_city.data or "").strip() or None
-        t.destination = (form.destination.data or "").strip() or None
+        t.department = (form.department.data or "").strip()
+        t.employee_name = (form.employee_name.data or "").strip()
+        t.origin = (form.origin.data or "").strip()
+        t.destination_city = (form.destination_city.data or "").strip()
+        t.destination = (form.destination.data or "").strip()
         t.status = TripStatus(form.status.data)
-        t.carrying_items = bool(form.carrying_items.data)
-        t.items_owner = ItemsOwner(form.items_owner.data) if form.items_owner.data else None
-        t.gatepass_no = (form.gatepass_no.data or "").strip() or None
-        t.items_reason = (form.items_reason.data or "").strip() or None
-        t.items_details = (form.items_details.data or "").strip() or None
-        t.items_return_status = ItemsReturnStatus(form.items_return_status.data) if form.items_return_status.data else None
-        t.items_not_returned_reason = (form.items_not_returned_reason.data or "").strip() or None
-        t.items_expected_return_date = form.items_expected_return_date.data
         t.notes = (form.notes.data or "").strip() or None
         db.session.commit()
         flash("Trip updated", "success")
         return redirect(url_for("trips.trip_list"))
 
-    return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}", trip=t)
+    return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
+
+
+@bp.post("/<int:trip_id>/end")
+@login_required
+@role_required(Role.SUPER_ADMIN, Role.ADMIN, Role.ENTRY_OPERATOR)
+def trip_end(trip_id: int):
+    t = db.session.get(Trip, trip_id)
+    if not t:
+        flash("Trip not found", "warning")
+        return redirect(url_for("trips.trip_list"))
+
+    if t.status not in _editable_statuses():
+        msg = "Only Planned / Assigned / In Transit trips can be ended"
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "error": msg}), 400
+        flash(msg, "danger")
+        return redirect(url_for("trips.trip_list"))
+
+    form = EndTripForm()
+    if not form.validate_on_submit():
+        msg = "End date/time and end odometer are required"
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "error": msg}), 400
+        flash(msg, "danger")
+        return redirect(url_for("trips.trip_list"))
+
+    end_odometer = form.end_odometer.data
+    start_odometer = t.odometer_start or 0
+    if end_odometer < start_odometer:
+        msg = "End odometer must be >= start odometer"
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "error": msg}), 400
+        flash(msg, "danger")
+        return redirect(url_for("trips.trip_list"))
+
+    # Expenses from repeatable rows
+    types = request.form.getlist("expense_type[]")
+    amounts = request.form.getlist("expense_amount[]")
+    remarks = request.form.getlist("expense_remarks[]")
+
+    expense_items: list[TripExpense] = []
+    row_count = max(len(types), len(amounts), len(remarks))
+    for i in range(row_count):
+        et = (types[i] if i < len(types) else "").strip().lower()
+        amt_raw = (amounts[i] if i < len(amounts) else "").strip()
+        rem = (remarks[i] if i < len(remarks) else "").strip()
+
+        if not et and not amt_raw and not rem:
+            continue
+        if et not in {e.value for e in TripExpenseType}:
+            msg = f"Invalid expense type at row {i + 1}"
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"ok": False, "error": msg}), 400
+            flash(msg, "danger")
+            return redirect(url_for("trips.trip_list"))
+        if not amt_raw:
+            msg = f"Amount is required at expense row {i + 1}"
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"ok": False, "error": msg}), 400
+            flash(msg, "danger")
+            return redirect(url_for("trips.trip_list"))
+        try:
+            amt = Decimal(amt_raw)
+        except Exception:
+            msg = f"Invalid amount at expense row {i + 1}"
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"ok": False, "error": msg}), 400
+            flash(msg, "danger")
+            return redirect(url_for("trips.trip_list"))
+        if amt < 0:
+            msg = f"Amount must be >= 0 at expense row {i + 1}"
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"ok": False, "error": msg}), 400
+            flash(msg, "danger")
+            return redirect(url_for("trips.trip_list"))
+
+        expense_items.append(
+            TripExpense(
+                trip_id=t.id,
+                expense_type=TripExpenseType(et),
+                amount=amt,
+                description=rem or None,
+                expense_date=(form.end_time.data.date() if form.end_time.data else None),
+            )
+        )
+
+    t.end_time = form.end_time.data
+    t.time_in = form.end_time.data  # backward compatibility
+    t.end_odometer = end_odometer
+    t.odometer_end = end_odometer  # backward compatibility
+    t.running_km = max(0, end_odometer - start_odometer)
+    t.status = TripStatus.COMPLETED
+    if form.notes.data:
+        existing = (t.notes or "").strip()
+        t.notes = f"{existing}\n{form.notes.data.strip()}".strip() if existing else form.notes.data.strip()
+
+    for x in expense_items:
+        db.session.add(x)
+
+    db.session.commit()
+
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return jsonify(
+            {
+                "ok": True,
+                "trip_id": t.id,
+                "status": t.status.value,
+                "end_time": t.end_time.strftime("%Y-%m-%d %H:%M") if t.end_time else "",
+                "end_odometer": t.end_odometer,
+                "running_km": t.running_km,
+            }
+        )
+
+    flash("Trip ended successfully", "success")
+    return redirect(url_for("trips.trip_list"))
 
 
 @bp.get("/<int:trip_id>/expenses")

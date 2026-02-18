@@ -1,8 +1,10 @@
-from flask_wtf import FlaskForm
-from wtforms import BooleanField, DateField, DateTimeLocalField, IntegerField, StringField, TextAreaField, SelectField, SubmitField
-from wtforms.validators import Optional, NumberRange
+from datetime import datetime
 
-from ...models import ItemsOwner, ItemsReturnStatus, TripStatus, UsageType
+from flask_wtf import FlaskForm
+from wtforms import DateTimeLocalField, IntegerField, StringField, TextAreaField, SelectField, SubmitField
+from wtforms.validators import DataRequired, Optional, NumberRange, Length
+
+from ...models import TripStatus, UsageType
 
 
 CITIES = [
@@ -21,48 +23,49 @@ CITIES = [
 
 
 class TripForm(FlaskForm):
-    vehicle_id = SelectField("Vehicle", coerce=int, validators=[Optional()])
-    driver_id = SelectField("Driver", coerce=int, validators=[Optional()])
-
-    # Trip closure fields (can be entered at trip end)
-    odometer_start = IntegerField("Start Odometer", validators=[Optional(), NumberRange(min=0)])
-    odometer_end = IntegerField("End Odometer", validators=[Optional(), NumberRange(min=0)])
-    time_out = DateTimeLocalField("Time Out", validators=[Optional()], format="%Y-%m-%dT%H:%M")
-    time_in = DateTimeLocalField("Time In", validators=[Optional()], format="%Y-%m-%dT%H:%M")
-
     usage_type = SelectField(
-        "Usage Type",
-        choices=[(s.value, s.name.replace("_", " ").title()) for s in UsageType],
+        "Trip Purpose",
+        choices=[
+            (UsageType.OFFICIAL.value, "Official"),
+            (UsageType.PERSONAL.value, "Personal"),
+            (UsageType.SCHOOL_VAN.value, "School Van"),
+            (UsageType.EDUCATION.value, "Education"),
+        ],
+        validators=[DataRequired()],
+        default=UsageType.OFFICIAL.value,
     )
-    department = StringField("Department", validators=[Optional()])
-    employee_name = StringField("Employee Name", validators=[Optional()])
 
-    origin = StringField("Origin", validators=[Optional()])
-    destination_city = SelectField("Destination City", choices=CITIES, validators=[Optional()])
-    destination = StringField("Destination", validators=[Optional()])
+    department = StringField("Department", validators=[DataRequired(), Length(min=2, max=120)])
+    employee_name = StringField("Employee Name", validators=[DataRequired(), Length(min=2, max=120)])
+
+    origin = StringField("Origin", validators=[DataRequired(), Length(min=2, max=120)])
+    destination_city = SelectField("Destination City", choices=CITIES, validators=[DataRequired()])
+    destination = StringField("Destination", validators=[DataRequired(), Length(min=2, max=160)])
+
+    time_out = DateTimeLocalField("Planned Time Out", validators=[DataRequired()], format="%Y-%m-%dT%H:%M")
+
+    vehicle_id = SelectField("Vehicle", coerce=int, validators=[DataRequired()])
+    driver_id = SelectField("Driver", coerce=int, validators=[DataRequired()])
+    odometer_start = IntegerField("Start Odometer", validators=[DataRequired(), NumberRange(min=0)])
+
+    notes = TextAreaField("Notes", validators=[Optional(), Length(max=1000)])
 
     status = SelectField(
         "Status",
         choices=[(s.value, s.name.replace("_", " ").title()) for s in TripStatus],
+        default=TripStatus.PLANNED.value,
+        validators=[DataRequired()],
     )
 
-    carrying_items = BooleanField("Carrying Items?", default=False)
-    items_owner = SelectField(
-        "Items Owner",
-        choices=[("", "--"), *[(s.value, s.name.title()) for s in ItemsOwner]],
-        validators=[Optional()],
-    )
-    gatepass_no = StringField("Gatepass No", validators=[Optional()])
-    items_reason = StringField("Reason for carrying items", validators=[Optional()])
-    items_details = TextAreaField("Items details", validators=[Optional()])
+    submit = SubmitField("Save Trip")
 
-    items_return_status = SelectField(
-        "Items Returned Status",
-        choices=[("", "--"), *[(s.value, s.name.replace("_", " ").title()) for s in ItemsReturnStatus]],
-        validators=[Optional()],
-    )
-    items_not_returned_reason = TextAreaField("Not returned reason", validators=[Optional()])
-    items_expected_return_date = DateField("Expected Return Date", validators=[Optional()], format="%Y-%m-%d")
 
-    notes = TextAreaField("Notes", validators=[Optional()])
-    submit = SubmitField("Save")
+class EndTripForm(FlaskForm):
+    end_time = DateTimeLocalField("End Date/Time", validators=[DataRequired()], format="%Y-%m-%dT%H:%M")
+    end_odometer = IntegerField("End Odometer", validators=[DataRequired(), NumberRange(min=0)])
+    notes = TextAreaField("Notes", validators=[Optional(), Length(max=1000)])
+    submit = SubmitField("End Trip")
+
+    def set_default_now(self):
+        if not self.end_time.data:
+            self.end_time.data = datetime.now()

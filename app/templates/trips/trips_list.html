@@ -5,7 +5,7 @@
 {{ page_header(
   'Trips',
   'Trips planning, assignment, and tracking',
-  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('trips.trip_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Trip</a>',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('trips.trip_create') ~ '"><i class="bi bi-plus-lg me-1"></i>Quick Trip</a>',
   secondary=''
     ~ '<div class="dropdown">'
     ~ '  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" type="button"><i class="bi bi-download me-1"></i>Export</button>'
@@ -51,9 +51,8 @@
               <th data-sort="vehicle" style="width:120px;">Vehicle</th>
               <th data-sort="driver" style="width:200px;">Driver</th>
               <th>Origin → Destination</th>
-              <th data-sort="usage" style="width:160px;">Usage Type</th>
+              <th data-sort="usage" style="width:160px;">Trip Purpose</th>
               <th data-sort="emp" style="width:220px;">Dept / Employee</th>
-              <th data-sort="gate" style="width:170px;">Gatepass</th>
               <th data-sort="updated" style="width:120px;">Updated</th>
               <th class="fm-actions"></th>
             </tr>
@@ -64,22 +63,11 @@
               {% set updated = (t.created_at.date().isoformat() if t.created_at else '') %}
               {% set plate = (t.vehicle.plate_no if t.vehicle else '') %}
               {% set driver = (t.driver.name if t.driver else '') %}
-              {% set origin = (t.origin or '—') %}
-              {% set dest = (t.destination_city or t.destination or '—') %}
-              {% set dept = (t.department or '—') %}
-              {% set emp = (t.employee_name or '—') %}
-
-              {% set gate_label = 'None' %}
-              {% set gate_tone = 'neutral' %}
-              {% if t.carrying_items %}
-                {% if t.items_expected_return_date %}
-                  {% set gate_label = 'Returnable' %}
-                  {% set gate_tone = 'info' %}
-                {% else %}
-                  {% set gate_label = 'Non-returnable' %}
-                  {% set gate_tone = 'warning' %}
-                {% endif %}
-              {% endif %}
+              {% set origin = (t.origin or '-') %}
+              {% set dest = (t.destination_city or t.destination or '-') %}
+              {% set dept = (t.department or '-') %}
+              {% set emp = (t.employee_name or '-') %}
+              {% set can_end = t.status.value in ['planned', 'assigned', 'in_transit'] %}
 
               <tr class="fm-row-link"
                   data-href="{{ url_for('trips.trip_edit', trip_id=t.id) }}"
@@ -93,27 +81,38 @@
                   data-dest="{{ (t.destination_city or '')|lower }} {{ (t.destination or '')|lower }}"
                   data-origin="{{ origin|lower }}"
                   data-updated="{{ updated }}"
-                  data-gate="{{ gate_label|lower }}"
+                  data-start-odo="{{ t.odometer_start or 0 }}"
               >
                 <td class="fm-mono fw-semibold">TRP-{{ '%05d'|format(t.id) }}</td>
-                <td>{{ badge(t.status.value) }}</td>
-                <td>{{ planned or '—' }}</td>
-                <td class="fw-semibold">{{ plate or '—' }}</td>
-                <td>{{ driver or '—' }}</td>
+                <td class="trip-status">{{ badge(t.status.value) }}</td>
+                <td>{{ planned or '-' }}</td>
+                <td class="fw-semibold">{{ plate or '-' }}</td>
+                <td>{{ driver or '-' }}</td>
                 <td>
                   <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ origin }}</div>
                   <div class="fw-semibold">{{ dest }}</div>
                 </td>
-                <td>{{ chip((t.usage_type.value if t.usage_type else '—')|replace('_',' ')|title, 'info') }}</td>
+                <td>{{ chip((t.usage_type.value if t.usage_type else '-')|replace('_',' ')|title, 'info') }}</td>
                 <td>
                   <div class="fw-semibold">{{ dept }}</div>
                   <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ emp }}</div>
                 </td>
-                <td>{{ chip(gate_label, gate_tone) }}</td>
-                <td>{{ updated or '—' }}</td>
+                <td>{{ updated or '-' }}</td>
                 <td class="fm-actions" onclick="event.stopPropagation();">
                   <div class="btn-group btn-group-sm" role="group" aria-label="Trip actions">
                     <a class="btn btn-outline-secondary btn-icon" title="View" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}"><i class="bi bi-eye"></i></a>
+                    <button
+                      class="btn btn-outline-primary btn-icon js-end-trip"
+                      title="End Trip"
+                      type="button"
+                      data-bs-toggle="modal"
+                      data-bs-target="#endTripModal"
+                      data-trip-id="{{ t.id }}"
+                      data-start-odo="{{ t.odometer_start or 0 }}"
+                      {% if not can_end %}disabled{% endif %}
+                    >
+                      <i class="bi bi-flag"></i>
+                    </button>
                     <a class="btn btn-outline-secondary btn-icon" title="Expenses" href="{{ url_for('trips.trip_expenses', trip_id=t.id) }}"><i class="bi bi-receipt"></i></a>
                     {% if current_user.role.value in ['super_admin','admin'] %}
                       <form id="trip-del-{{ t.id }}" method="post" action="{{ url_for('trips.trip_delete', trip_id=t.id) }}" style="display:inline-block">
@@ -132,6 +131,53 @@
         </table>
       </div>
 
+      <div class="modal fade" id="endTripModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <form id="endTripForm" method="post">
+              <div class="modal-header">
+                <h5 class="modal-title">End Trip</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                {{ end_form.hidden_tag() }}
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label" for="end_time">End Date/Time</label>
+                    <input class="form-control" type="datetime-local" id="end_time" name="end_time" required>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label" for="end_odometer">End Odometer</label>
+                    <input class="form-control" type="number" min="0" id="end_odometer" name="end_odometer" required>
+                    <div class="form-text">Must be greater than or equal to start odometer.</div>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Running KM</label>
+                    <input class="form-control" type="number" id="running_km" readonly>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label" for="end_notes">Notes</label>
+                    <textarea class="form-control" rows="2" id="end_notes" name="notes"></textarea>
+                  </div>
+                </div>
+
+                <hr>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="mb-0">Expenses</h6>
+                  <button class="btn btn-sm btn-outline-secondary" type="button" id="addExpenseRow"><i class="bi bi-plus-lg me-1"></i>Add Row</button>
+                </div>
+                <div id="expenseRows"></div>
+                <div class="small text-danger mt-2 d-none" id="endTripError"></div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-primary">End Trip</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
       <script>
         (function(){
           const table = document.getElementById('tripsTable');
@@ -145,7 +191,6 @@
           const veh = document.getElementById('tripVehicle');
           const drv = document.getElementById('tripDriver');
 
-          // Populate dropdowns from rows (UI-only)
           const vehicles = new Set();
           const drivers = new Set();
           Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
@@ -154,12 +199,8 @@
             if(v) vehicles.add(v);
             if(d) drivers.add(d);
           });
-          Array.from(vehicles).sort().forEach(v => {
-            const o = document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o);
-          });
-          Array.from(drivers).sort().forEach(d => {
-            const o = document.createElement('option'); o.value=d; o.textContent=d; drv.appendChild(o);
-          });
+          Array.from(vehicles).sort().forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o); });
+          Array.from(drivers).sort().forEach(d => { const o=document.createElement('option'); o.value=d; o.textContent=d; drv.appendChild(o); });
 
           function inRange(d){
             if(!d) return true;
@@ -200,7 +241,6 @@
           veh?.addEventListener('change', apply);
           drv?.addEventListener('change', apply);
 
-          // Row click -> view
           tbody.querySelectorAll('tr[data-href]').forEach(tr => {
             tr.addEventListener('click', () => {
               const href = tr.getAttribute('data-href');
@@ -208,35 +248,118 @@
             });
           });
 
-          // Client-side sorting
-          let sortKey = null; let sortDir = 1;
-          function getVal(tr,key){
-            if(key==='id') return tr.dataset.id.padStart(10,'0');
-            if(key==='status') return tr.dataset.status;
-            if(key==='planned') return tr.dataset.planned || '9999-12-31';
-            if(key==='vehicle') return tr.dataset.vehicle;
-            if(key==='driver') return tr.dataset.driver;
-            if(key==='usage') return tr.dataset.usage;
-            if(key==='emp') return tr.dataset.emp;
-            if(key==='gate') return tr.dataset.gate;
-            if(key==='updated') return tr.dataset.updated;
-            return '';
+          // End Trip modal logic
+          const endTripForm = document.getElementById('endTripForm');
+          const endTime = document.getElementById('end_time');
+          const endOdo = document.getElementById('end_odometer');
+          const runningKm = document.getElementById('running_km');
+          const expenseRows = document.getElementById('expenseRows');
+          const addExpenseRow = document.getElementById('addExpenseRow');
+          const errBox = document.getElementById('endTripError');
+
+          let currentTripId = null;
+          let currentStartOdo = 0;
+
+          function nowLocal(){
+            const d = new Date();
+            const pad = n => String(n).padStart(2,'0');
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
           }
-          table.querySelectorAll('thead th[data-sort]').forEach(th => {
-            th.style.cursor='pointer';
-            th.addEventListener('click', () => {
-              const key = th.getAttribute('data-sort');
-              if(sortKey === key) sortDir = -sortDir; else { sortKey=key; sortDir=1; }
-              const rows = Array.from(tbody.querySelectorAll('tr'));
-              rows.sort((a,b)=> getVal(a,key).localeCompare(getVal(b,key)) * sortDir);
-              rows.forEach(r=>tbody.appendChild(r));
+
+          function recalcKm(){
+            const e = parseInt(endOdo?.value || '', 10);
+            if(Number.isNaN(e)){ runningKm.value = ''; return; }
+            runningKm.value = String(Math.max(0, e - currentStartOdo));
+          }
+
+          function addRow(data){
+            const row = document.createElement('div');
+            row.className = 'row g-2 align-items-end mb-2 expense-row';
+            row.innerHTML = `
+              <div class="col-md-4">
+                <label class="form-label">Expense Type</label>
+                <select name="expense_type[]" class="form-select" required>
+                  <option value="fuel">Fuel</option>
+                  <option value="toll">Toll</option>
+                  <option value="parking">Parking</option>
+                  <option value="repair">Repair</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Amount</label>
+                <input name="expense_amount[]" type="number" step="0.01" min="0" class="form-control" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Remarks</label>
+                <input name="expense_remarks[]" type="text" class="form-control">
+              </div>
+              <div class="col-md-1">
+                <button type="button" class="btn btn-outline-danger btn-sm w-100 remove-row">×</button>
+              </div>
+            `;
+            expenseRows.appendChild(row);
+            row.querySelector('.remove-row').addEventListener('click', () => row.remove());
+            if(data){
+              row.querySelector('select').value = data.type || 'fuel';
+              row.querySelector('input[name="expense_amount[]"]').value = data.amount || '';
+              row.querySelector('input[name="expense_remarks[]"]').value = data.remarks || '';
+            }
+          }
+
+          addExpenseRow?.addEventListener('click', () => addRow());
+          endOdo?.addEventListener('input', recalcKm);
+
+          document.querySelectorAll('.js-end-trip').forEach(btn => {
+            btn.addEventListener('click', () => {
+              currentTripId = btn.dataset.tripId;
+              currentStartOdo = parseInt(btn.dataset.startOdo || '0', 10) || 0;
+              endTripForm.action = `/trips/${currentTripId}/end`;
+              endTime.value = nowLocal();
+              endOdo.value = '';
+              runningKm.value = '';
+              expenseRows.innerHTML = '';
+              errBox.classList.add('d-none');
+              errBox.textContent = '';
             });
+          });
+
+          endTripForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errBox.classList.add('d-none');
+            errBox.textContent = '';
+
+            const eOdo = parseInt(endOdo.value || '', 10);
+            if(Number.isNaN(eOdo) || eOdo < currentStartOdo){
+              errBox.textContent = 'End odometer must be greater than or equal to start odometer.';
+              errBox.classList.remove('d-none');
+              return;
+            }
+
+            const fd = new FormData(endTripForm);
+            try {
+              const res = await fetch(endTripForm.action, {
+                method: 'POST',
+                body: fd,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+              });
+              const data = await res.json();
+              if(!res.ok || !data.ok){
+                errBox.textContent = data.error || 'Failed to end trip';
+                errBox.classList.remove('d-none');
+                return;
+              }
+              window.location.reload();
+            } catch (_) {
+              errBox.textContent = 'Network error while ending trip';
+              errBox.classList.remove('d-none');
+            }
           });
         })();
       </script>
 
     {% else %}
-      {{ empty_state('bi-sign-turn-right', 'No trips yet', 'Create a trip request to start planning and tracking.', 'New Trip', url_for('trips.trip_create')) }}
+      {{ empty_state('bi-sign-turn-right', 'No trips yet', 'Create a trip request to start planning and tracking.', 'Quick Trip', url_for('trips.trip_create')) }}
     {% endif %}
 
   </div>
