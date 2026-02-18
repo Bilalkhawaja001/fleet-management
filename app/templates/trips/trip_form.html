@@ -5,64 +5,40 @@
 {{ page_header(title, 'Quick Trip entry') }}
 
 <div class="row justify-content-center">
-  <div class="col-12 col-xl-9">
+  <div class="col-12 col-xl-10">
     <form method="post" class="card fm-card" id="tripForm">
       <div class="card-body">
         {{ form.hidden_tag() }}
 
         <div class="row g-3">
-          <div class="col-md-4">
-            {{ form.usage_type.label(class_='form-label') }}
-            {{ form.usage_type(class_='form-select') }}
-          </div>
-          <div class="col-md-4">
-            {{ form.department.label(class_='form-label') }}
-            {{ form.department(class_='form-control') }}
-          </div>
-          <div class="col-md-4">
-            {{ form.employee_name.label(class_='form-label') }}
-            {{ form.employee_name(class_='form-control') }}
-          </div>
+          <div class="col-md-4">{{ form.usage_type.label(class_='form-label') }}{{ form.usage_type(class_='form-select') }}</div>
+          <div class="col-md-4">{{ form.department.label(class_='form-label') }}{{ form.department(class_='form-control') }}</div>
+          <div class="col-md-4">{{ form.employee_name.label(class_='form-label') }}{{ form.employee_name(class_='form-control') }}</div>
 
-          <div class="col-md-4">
-            {{ form.origin.label(class_='form-label') }}
-            {{ form.origin(class_='form-control') }}
-          </div>
-          <div class="col-md-4">
-            {{ form.destination_city.label(class_='form-label') }}
-            {{ form.destination_city(class_='form-select') }}
-          </div>
-          <div class="col-md-4">
-            {{ form.destination.label(class_='form-label') }}
-            {{ form.destination(class_='form-control') }}
-          </div>
+          <div class="col-md-4">{{ form.origin.label(class_='form-label') }}{{ form.origin(class_='form-control') }}</div>
+          <div class="col-md-4">{{ form.destination_city.label(class_='form-label') }}{{ form.destination_city(class_='form-select') }}</div>
+          <div class="col-md-4">{{ form.destination.label(class_='form-label') }}{{ form.destination(class_='form-control') }}</div>
 
-          <div class="col-md-4">
-            {{ form.time_out.label(class_='form-label') }}
-            {{ form.time_out(class_='form-control', type='datetime-local') }}
-          </div>
-          <div class="col-md-4">
-            {{ form.vehicle_id.label(class_='form-label') }}
-            {{ form.vehicle_id(class_='form-select') }}
-          </div>
-          <div class="col-md-4">
-            {{ form.driver_id.label(class_='form-label') }}
-            {{ form.driver_id(class_='form-select') }}
-          </div>
+          <div class="col-md-4">{{ form.time_out.label(class_='form-label') }}{{ form.time_out(class_='form-control', type='datetime-local') }}</div>
+          <div class="col-md-4">{{ form.vehicle_id.label(class_='form-label') }}{{ form.vehicle_id(class_='form-select') }}</div>
+          <div class="col-md-4">{{ form.driver_id.label(class_='form-label') }}{{ form.driver_id(class_='form-select') }}</div>
 
-          <div class="col-md-4">
-            {{ form.odometer_start.label(class_='form-label') }}
-            {{ form.odometer_start(class_='form-control', type='number', min='0') }}
-          </div>
-          <div class="col-md-4">
-            {{ form.status.label(class_='form-label') }}
-            {{ form.status(class_='form-select') }}
-          </div>
-          <div class="col-12">
-            {{ form.notes.label(class_='form-label') }}
-            {{ form.notes(class_='form-control', rows=3) }}
-          </div>
+          <div class="col-md-4">{{ form.odometer_start.label(class_='form-label') }}{{ form.odometer_start(class_='form-control', type='number', min='0') }}</div>
+          <div class="col-md-4">{{ form.status.label(class_='form-label') }}{{ form.status(class_='form-select') }}</div>
+          <div class="col-12">{{ form.notes.label(class_='form-label') }}{{ form.notes(class_='form-control', rows=3) }}</div>
         </div>
+
+        <hr>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Carrying Items (Gatepass/Items)</h6>
+          <button class="btn btn-sm btn-outline-secondary" type="button" id="addItemRow"><i class="bi bi-plus-lg me-1"></i>Add Row</button>
+        </div>
+        <div id="itemRows"></div>
+        <datalist id="deptListInline">
+          <option value="Centralized"></option>
+          <option value="Weaving"></option>
+          <option value="Spinning"></option>
+        </datalist>
 
         <div class="d-flex gap-2 pt-3 justify-content-end">
           {{ form.submit(class_='btn btn-primary') }}
@@ -72,5 +48,85 @@
     </form>
   </div>
 </div>
+
+<script>
+(function(){
+  const rows = document.getElementById('itemRows');
+  const addBtn = document.getElementById('addItemRow');
+
+  function toggleCompanyFields(row){
+    const own = row.querySelector('select[name="item_ownership[]"]')?.value;
+    row.querySelectorAll('.company-only').forEach(el => {
+      el.style.display = own === 'company' ? '' : 'none';
+    });
+  }
+
+  function addItemRow(){
+    const row = document.createElement('div');
+    row.className = 'border rounded p-2 mb-2 item-row';
+    row.innerHTML = `
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label">Ownership</label>
+          <select name="item_ownership[]" class="form-select" required>
+            <option value="personal">Personal</option>
+            <option value="company">Company</option>
+          </select>
+        </div>
+        <div class="col-md-2 company-only">
+          <label class="form-label">Gatepass No</label>
+          <input type="text" name="item_gatepass_no[]" class="form-control">
+        </div>
+        <div class="col-md-2 company-only">
+          <label class="form-label">Department</label>
+          <input type="text" name="item_department[]" class="form-control" list="deptListInline">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Item</label>
+          <input type="text" name="item_description[]" class="form-control">
+        </div>
+        <div class="col-md-1">
+          <label class="form-label">Qty</label>
+          <input type="number" step="0.01" min="0" name="item_qty[]" class="form-control">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">UoM</label>
+          <select name="item_uom[]" class="form-select" required>
+            <option value="pcs">pcs</option><option value="kg">kg</option><option value="meter">meter</option><option value="roll">roll</option>
+            <option value="box">box</option><option value="set">set</option><option value="litre">litre</option><option value="bag">bag</option>
+            <option value="bundle">bundle</option><option value="carton">carton</option><option value="other">other</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Destination</label>
+          <input type="text" name="item_destination[]" class="form-control">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Return Type</label>
+          <select name="item_return_type[]" class="form-select" required>
+            <option value="returnable">Returnable</option>
+            <option value="not_returnable">Not Returnable</option>
+            <option value="partial_return">Partial Return</option>
+            <option value="sample">Sample</option>
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Notes/Remarks</label>
+          <input type="text" name="item_notes[]" class="form-control">
+        </div>
+        <div class="col-md-1">
+          <button type="button" class="btn btn-outline-danger btn-sm w-100 remove-item-row">×</button>
+        </div>
+      </div>
+    `;
+    rows.appendChild(row);
+    row.querySelector('select[name="item_ownership[]"]').addEventListener('change', () => toggleCompanyFields(row));
+    row.querySelector('.remove-item-row').addEventListener('click', () => row.remove());
+    toggleCompanyFields(row);
+  }
+
+  addBtn?.addEventListener('click', addItemRow);
+})();
+</script>
 
 {% endblock %}

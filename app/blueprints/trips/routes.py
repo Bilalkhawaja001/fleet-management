@@ -25,6 +25,78 @@ def _editable_statuses():
     return {TripStatus.ASSIGNED, TripStatus.IN_TRANSIT}
 
 
+def _parse_trip_items_or_error():
+    item_ownerships = request.form.getlist("item_ownership[]")
+    item_gatepass = request.form.getlist("item_gatepass_no[]")
+    item_depts = request.form.getlist("item_department[]")
+    item_descs = request.form.getlist("item_description[]")
+    item_qtys = request.form.getlist("item_qty[]")
+    item_uoms = request.form.getlist("item_uom[]")
+    item_dests = request.form.getlist("item_destination[]")
+    item_returns = request.form.getlist("item_return_type[]")
+    item_notes = request.form.getlist("item_notes[]")
+
+    rows = []
+    item_row_count = max(
+        len(item_ownerships), len(item_gatepass), len(item_depts), len(item_descs), len(item_qtys), len(item_uoms), len(item_dests), len(item_returns), len(item_notes)
+    )
+
+    for i in range(item_row_count):
+        ownership = (item_ownerships[i] if i < len(item_ownerships) else "").strip().lower()
+        gatepass = (item_gatepass[i] if i < len(item_gatepass) else "").strip()
+        dept = (item_depts[i] if i < len(item_depts) else "").strip()
+        desc = (item_descs[i] if i < len(item_descs) else "").strip()
+        qty_raw = (item_qtys[i] if i < len(item_qtys) else "").strip()
+        uom = (item_uoms[i] if i < len(item_uoms) else "").strip().lower()
+        dest = (item_dests[i] if i < len(item_dests) else "").strip()
+        return_type = (item_returns[i] if i < len(item_returns) else "").strip().lower()
+        notes = (item_notes[i] if i < len(item_notes) else "").strip()
+
+        if not any([ownership, gatepass, dept, desc, qty_raw, uom, dest, return_type, notes]):
+            continue
+
+        if ownership not in {e.value for e in ItemOwnership}:
+            return None, f"Ownership is required at item row {i + 1}"
+        if not desc:
+            return None, f"Item description is required at item row {i + 1}"
+        if not qty_raw:
+            return None, f"Qty is required at item row {i + 1}"
+        try:
+            qty = Decimal(qty_raw)
+        except Exception:
+            return None, f"Qty is invalid at item row {i + 1}"
+        if qty <= 0:
+            return None, f"Qty must be > 0 at item row {i + 1}"
+        if uom not in {e.value for e in ItemUom}:
+            return None, f"UoM is required at item row {i + 1}"
+        if not dest:
+            return None, f"Destination is required at item row {i + 1}"
+        if return_type not in {e.value for e in ItemReturnType}:
+            return None, f"Return type is required at item row {i + 1}"
+
+        if ownership == ItemOwnership.COMPANY.value:
+            if not gatepass:
+                return None, f"Gatepass No is required for company item at row {i + 1}"
+            if not dept:
+                return None, f"Department is required for company item at row {i + 1}"
+
+        rows.append(
+            {
+                "ownership": ItemOwnership(ownership),
+                "gatepass_no": gatepass or None,
+                "department": dept or None,
+                "item_description": desc,
+                "qty": qty,
+                "uom": ItemUom(uom),
+                "destination": dest,
+                "return_type": ItemReturnType(return_type),
+                "notes": notes or None,
+            }
+        )
+
+    return rows, None
+
+
 @bp.get("/")
 @login_required
 def trip_list():
@@ -68,6 +140,11 @@ def trip_create():
             flash("Driver is required", "danger")
             return render_template("trips/trip_form.html", form=form, title="Quick Trip")
 
+        item_rows, item_err = _parse_trip_items_or_error()
+        if item_err:
+            flash(item_err, "danger")
+            return render_template("trips/trip_form.html", form=form, title="Quick Trip")
+
         t = Trip(
             vehicle_id=form.vehicle_id.data,
             driver_id=form.driver_id.data,
@@ -83,6 +160,11 @@ def trip_create():
             notes=(form.notes.data or "").strip() or None,
         )
         db.session.add(t)
+        db.session.flush()
+
+        for row in item_rows:
+            db.session.add(TripItem(trip_id=t.id, **row))
+
         db.session.commit()
         flash("Trip saved", "success")
         return redirect(url_for("trips.trip_list"))
@@ -123,6 +205,11 @@ def trip_edit(trip_id: int):
             flash("Driver is required", "danger")
             return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
 
+        item_rows, item_err = _parse_trip_items_or_error()
+        if item_err:
+            flash(item_err, "danger")
+            return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
+
         t.vehicle_id = form.vehicle_id.data
         t.driver_id = form.driver_id.data
         t.odometer_start = form.odometer_start.data
@@ -135,6 +222,11 @@ def trip_edit(trip_id: int):
         t.destination = (form.destination.data or "").strip()
         t.status = TripStatus(form.status.data)
         t.notes = (form.notes.data or "").strip() or None
+
+        TripItem.query.filter(TripItem.trip_id == t.id).delete()
+        for row in item_rows:
+            db.session.add(TripItem(trip_id=t.id, **row))
+
         db.session.commit()
         flash("Trip updated", "success")
         return redirect(url_for("trips.trip_list"))
@@ -227,120 +319,14 @@ def trip_end(trip_id: int):
             )
         )
 
-    # Carrying items rows
-    item_ownerships = request.form.getlist("item_ownership[]")
-    item_gatepass = request.form.getlist("item_gatepass_no[]")
-    item_depts = request.form.getlist("item_department[]")
-    item_descs = request.form.getlist("item_description[]")
-    item_qtys = request.form.getlist("item_qty[]")
-    item_uoms = request.form.getlist("item_uom[]")
-    item_dests = request.form.getlist("item_destination[]")
-    item_returns = request.form.getlist("item_return_type[]")
-    item_notes = request.form.getlist("item_notes[]")
-
-    trip_items: list[TripItem] = []
-    item_row_count = max(
-        len(item_ownerships), len(item_gatepass), len(item_depts), len(item_descs), len(item_qtys), len(item_uoms), len(item_dests), len(item_returns), len(item_notes)
-    )
-
-    for i in range(item_row_count):
-        ownership = (item_ownerships[i] if i < len(item_ownerships) else "").strip().lower()
-        gatepass = (item_gatepass[i] if i < len(item_gatepass) else "").strip()
-        dept = (item_depts[i] if i < len(item_depts) else "").strip()
-        desc = (item_descs[i] if i < len(item_descs) else "").strip()
-        qty_raw = (item_qtys[i] if i < len(item_qtys) else "").strip()
-        uom = (item_uoms[i] if i < len(item_uoms) else "").strip().lower()
-        dest = (item_dests[i] if i < len(item_dests) else "").strip()
-        return_type = (item_returns[i] if i < len(item_returns) else "").strip().lower()
-        notes = (item_notes[i] if i < len(item_notes) else "").strip()
-
-        if not any([ownership, gatepass, dept, desc, qty_raw, uom, dest, return_type, notes]):
-            continue
-
-        if ownership not in {e.value for e in ItemOwnership}:
-            msg = f"Ownership is required at item row {i + 1}"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"ok": False, "error": msg}), 400
-            flash(msg, "danger")
-            return redirect(url_for("trips.trip_list"))
-
-        if not desc:
-            msg = f"Item description is required at item row {i + 1}"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"ok": False, "error": msg}), 400
-            flash(msg, "danger")
-            return redirect(url_for("trips.trip_list"))
-
-        if not qty_raw:
-            msg = f"Qty is required at item row {i + 1}"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"ok": False, "error": msg}), 400
-            flash(msg, "danger")
-            return redirect(url_for("trips.trip_list"))
-        try:
-            qty = Decimal(qty_raw)
-        except Exception:
-            msg = f"Qty is invalid at item row {i + 1}"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"ok": False, "error": msg}), 400
-            flash(msg, "danger")
-            return redirect(url_for("trips.trip_list"))
-        if qty <= 0:
-            msg = f"Qty must be > 0 at item row {i + 1}"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"ok": False, "error": msg}), 400
-            flash(msg, "danger")
-            return redirect(url_for("trips.trip_list"))
-
-        if uom not in {e.value for e in ItemUom}:
-            msg = f"UoM is required at item row {i + 1}"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"ok": False, "error": msg}), 400
-            flash(msg, "danger")
-            return redirect(url_for("trips.trip_list"))
-
-        if not dest:
-            msg = f"Destination is required at item row {i + 1}"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"ok": False, "error": msg}), 400
-            flash(msg, "danger")
-            return redirect(url_for("trips.trip_list"))
-
-        if return_type not in {e.value for e in ItemReturnType}:
-            msg = f"Return type is required at item row {i + 1}"
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"ok": False, "error": msg}), 400
-            flash(msg, "danger")
-            return redirect(url_for("trips.trip_list"))
-
-        if ownership == ItemOwnership.COMPANY.value:
-            if not gatepass:
-                msg = f"Gatepass No is required for company item at row {i + 1}"
-                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                    return jsonify({"ok": False, "error": msg}), 400
-                flash(msg, "danger")
-                return redirect(url_for("trips.trip_list"))
-            if not dept:
-                msg = f"Department is required for company item at row {i + 1}"
-                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                    return jsonify({"ok": False, "error": msg}), 400
-                flash(msg, "danger")
-                return redirect(url_for("trips.trip_list"))
-
-        trip_items.append(
-            TripItem(
-                trip_id=t.id,
-                ownership=ItemOwnership(ownership),
-                gatepass_no=(gatepass or None),
-                department=(dept or None),
-                item_description=desc,
-                qty=qty,
-                uom=ItemUom(uom),
-                destination=dest,
-                return_type=ItemReturnType(return_type),
-                notes=(notes or None),
-            )
-        )
+    has_returnable_items = any(getattr(i.return_type, 'value', i.return_type) == ItemReturnType.RETURNABLE.value for i in (t.trip_items or []))
+    return_confirm = (request.form.get("return_confirmation") or "").strip().lower() in {"1", "true", "yes", "on"}
+    if has_returnable_items and not return_confirm:
+        msg = "Please confirm returnable items status before ending trip"
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False, "error": msg}), 400
+        flash(msg, "danger")
+        return redirect(url_for("trips.trip_list"))
 
     t.end_time = form.end_time.data
     t.time_in = form.end_time.data
@@ -352,10 +338,11 @@ def trip_end(trip_id: int):
         existing = (t.notes or "").strip()
         t.notes = f"{existing}\n{form.notes.data.strip()}".strip() if existing else form.notes.data.strip()
 
+    t.returnable_items_confirmed = bool(return_confirm)
+    t.returnable_items_confirmed_at = datetime.utcnow() if return_confirm else None
+
     for x in expense_items:
         db.session.add(x)
-    for it in trip_items:
-        db.session.add(it)
 
     db.session.commit()
 
@@ -368,7 +355,7 @@ def trip_end(trip_id: int):
                 "end_time": t.end_time.strftime("%Y-%m-%d %H:%M") if t.end_time else "",
                 "end_odometer": t.end_odometer,
                 "running_km": t.running_km,
-                "items_saved": len(trip_items),
+                "returnable_items_confirmed": t.returnable_items_confirmed,
             }
         )
 

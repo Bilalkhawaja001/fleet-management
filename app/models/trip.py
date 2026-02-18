@@ -47,6 +47,10 @@ class Trip(db.Model):
     end_time = db.Column(db.DateTime, nullable=True)
     running_km = db.Column(db.Integer, nullable=True)
 
+    # End-trip confirmation for returnable carried items
+    returnable_items_confirmed = db.Column(db.Boolean, nullable=False, default=False)
+    returnable_items_confirmed_at = db.Column(db.DateTime, nullable=True)
+
     usage_type = db.Column(db.Enum(UsageType), nullable=False, default=UsageType.OFFICIAL)
     department = db.Column(db.String(120), nullable=True)
     employee_name = db.Column(db.String(120), nullable=True)
