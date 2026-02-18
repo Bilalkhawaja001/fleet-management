@@ -31,8 +31,12 @@
       <i class="bi bi-layout-sidebar"></i>
     </button>
 
-    <a class="navbar-brand fw-semibold ms-2" href="/dashboard/">
-      <i class="bi bi-truck-front me-1"></i> Fleet
+    <a class="navbar-brand fw-semibold ms-2 d-flex align-items-center gap-2" href="/dashboard/">
+      <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Liberty Mills Logo" style="height:40px; width:auto; object-fit:contain;">
+      <span class="d-flex flex-column lh-sm">
+        <span style="font-size:.78rem;">Liberty Mills Limited</span>
+        <span style="font-size:.95rem;">Fleet Management</span>
+      </span>
     </a>
 
     <div class="ms-auto d-flex align-items-center gap-2">
@@ -84,7 +88,13 @@
     <!-- Sidebar (mobile offcanvas) -->
     <div class="offcanvas offcanvas-start" tabindex="-1" id="fmSidebar" aria-labelledby="fmSidebarLabel">
       <div class="offcanvas-header">
-        <div class="offcanvas-title fw-semibold" id="fmSidebarLabel"><i class="bi bi-truck-front me-1"></i> Fleet</div>
+        <div class="offcanvas-title fw-semibold d-flex align-items-center gap-2" id="fmSidebarLabel">
+          <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Liberty Mills Logo" style="height:34px; width:auto; object-fit:contain;">
+          <span class="d-flex flex-column lh-sm">
+            <span style="font-size:.72rem;">Liberty Mills Limited</span>
+            <span style="font-size:.9rem;">Fleet Management</span>
+          </span>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
       </div>
       <div class="offcanvas-body">

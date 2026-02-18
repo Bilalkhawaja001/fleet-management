@@ -22,6 +22,13 @@ CITIES = [
 ]
 
 
+DEPARTMENTS = [
+    ("Centralized", "Centralized"),
+    ("Spinning", "Spinning"),
+    ("Weaving", "Weaving"),
+]
+
+
 class TripForm(FlaskForm):
     usage_type = SelectField(
         "Trip Purpose",
@@ -35,10 +42,10 @@ class TripForm(FlaskForm):
         default=UsageType.OFFICIAL.value,
     )
 
-    department = StringField("Department", validators=[DataRequired(), Length(min=2, max=120)])
+    department = SelectField("Department", choices=DEPARTMENTS, validators=[DataRequired()])
     employee_name = StringField("Employee Name", validators=[DataRequired(), Length(min=2, max=120)])
 
-    origin = StringField("Origin", validators=[DataRequired(), Length(min=2, max=120)])
+    origin = StringField("Origin", validators=[DataRequired(), Length(min=2, max=120)], default="Nooriabad")
     destination_city = SelectField("Destination City", choices=CITIES, validators=[DataRequired()])
     destination = StringField("Destination", validators=[DataRequired(), Length(min=2, max=160)])
 

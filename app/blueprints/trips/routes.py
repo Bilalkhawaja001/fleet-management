@@ -129,7 +129,7 @@ def trip_list():
 @login_required
 @role_required(Role.SUPER_ADMIN, Role.ADMIN, Role.ENTRY_OPERATOR)
 def trip_create():
-    form = TripForm(status=TripStatus.PLANNED.value, usage_type=UsageType.OFFICIAL.value)
+    form = TripForm(status=TripStatus.PLANNED.value, usage_type=UsageType.OFFICIAL.value, department="Centralized", origin="Nooriabad")
     _fill_choices(form)
 
     if form.validate_on_submit():
@@ -187,9 +187,9 @@ def trip_edit(trip_id: int):
         odometer_start=t.odometer_start,
         time_out=t.time_out,
         usage_type=t.usage_type.value if t.usage_type else UsageType.OFFICIAL.value,
-        department=t.department,
+        department=t.department or "Centralized",
         employee_name=t.employee_name,
-        origin=t.origin,
+        origin=t.origin or "Nooriabad",
         destination_city=t.destination_city,
         destination=t.destination,
         status=t.status.value,
@@ -411,7 +411,17 @@ def trip_delete(trip_id: int):
         flash("Trip not found", "warning")
         return redirect(url_for("trips.trip_list"))
 
-    db.session.delete(t)
-    db.session.commit()
-    flash("Trip deleted", "success")
+    try:
+        # Break FK dependencies first for safe delete
+        FuelEntry.query.filter(FuelEntry.trip_id == t.id).update({FuelEntry.trip_id: None}, synchronize_session=False)
+        TripExpense.query.filter(TripExpense.trip_id == t.id).delete(synchronize_session=False)
+        TripItem.query.filter(TripItem.trip_id == t.id).delete(synchronize_session=False)
+
+        db.session.delete(t)
+        db.session.commit()
+        flash("Trip deleted", "success")
+    except Exception as exc:
+        db.session.rollback()
+        flash(f"Trip could not be deleted: {exc}", "danger")
+
     return redirect(url_for("trips.trip_list"))

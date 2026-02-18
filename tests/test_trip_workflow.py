@@ -50,7 +50,7 @@ def test_trip_create_saves_company_items():
     res = client.post('/trips/new', data={
         'csrf_token': token,
         'usage_type': UsageType.OFFICIAL.value,
-        'department': 'Operations',
+        'department': 'Centralized',
         'employee_name': 'Bilal',
         'origin': 'Nooriabad',
         'destination_city': 'Karachi',
@@ -93,7 +93,7 @@ def test_trip_create_saves_personal_items_minimal():
     res = client.post('/trips/new', data={
         'csrf_token': token,
         'usage_type': UsageType.PERSONAL.value,
-        'department': 'Operations',
+        'department': 'Centralized',
         'employee_name': 'Bilal',
         'origin': 'Nooriabad',
         'destination_city': 'Karachi',
@@ -168,3 +168,4 @@ def test_end_plus_success_and_odometer_validation_and_csrf():
 
     csrf_fail = client.post(f'/trips/{trip_id}/end-plus', data={'end_time': '2026-02-18T12:00', 'end_odometer': '560'}, headers={'X-Requested-With':'XMLHttpRequest'})
     assert csrf_fail.status_code == 400
+
