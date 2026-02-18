@@ -20,7 +20,7 @@ def _choices(form: FuelEntryForm):
     form.driver_id.choices += [(d.id, d.name) for d in Driver.query.order_by(Driver.name).all()]
 
     form.trip_id.choices = [(0, "--")]
-    form.trip_id.choices += [(t.id, f"#{t.id} {t.origin or ''}→{t.destination_city or ''} {t.destination or ''}") for t in Trip.query.order_by(Trip.id.desc()).limit(200).all()]
+    form.trip_id.choices += [(t.id, f"#{t.id} {t.origin or ''} -> {t.destination_city or ''} {t.destination or ''}") for t in Trip.query.order_by(Trip.id.desc()).limit(200).all()]
 
 
 @bp.get("/")
@@ -32,7 +32,6 @@ def fuel_list():
     q = FuelEntry.query.options(
         selectinload(FuelEntry.vehicle),
         selectinload(FuelEntry.driver),
-        selectinload(FuelEntry.trip),
         selectinload(FuelEntry.verified_by)
     )
     status = (request.args.get("status") or "").strip()

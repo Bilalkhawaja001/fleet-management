@@ -3,6 +3,7 @@ from .vehicle import Vehicle
 from .driver import Driver
 from .trip import Trip, TripStatus, UsageType, ItemsOwner, ItemsReturnStatus
 from .trip_expense import TripExpense, TripExpenseType
+from .trip_item import TripItem, ItemOwnership, ItemUom, ItemReturnType
 from .fuel_log import FuelLog
 from .fuel_entry import FuelEntry, FuelEntryStatus, FuelPurpose, FuelType
 from .vehicle_document import VehicleDocument, VehicleDocType, VehicleDocStatus
@@ -24,6 +25,10 @@ __all__ = [
     "ItemsOwner",
     "ItemsReturnStatus",
     "TripExpense",
+    "TripItem",
+    "ItemOwnership",
+    "ItemUom",
+    "ItemReturnType",
     "TripExpenseType",
     "FuelLog",
     "FuelEntry",
