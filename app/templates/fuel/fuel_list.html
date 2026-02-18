@@ -80,13 +80,13 @@
                 data-verby="{{ verby|lower }}"
                 data-qty="{{ e.liters or '' }}"
                 data-rate="{{ e.rate or '' }}"
-                data-type="{{ e.fuel_purpose.value }}"
+                data-type="{{ e.fuel_purpose }}"
               >
                 <td class="fm-mono fw-semibold">{{ e.slip_no }}</td>
                 <td>{{ day or '—' }}</td>
                 <td class="fw-semibold">{{ plate }}</td>
                 <td>{{ drv or '—' }}</td>
-                <td>{{ chip(e.fuel_purpose.value|replace('_',' ')|title, 'info') }}</td>
+                <td>{{ chip((e.fuel_purpose or 'official')|replace('_',' ')|title, 'info') }}</td>
                 <td class="fm-num">{{ ('%.2f'|format(e.liters)) if e.liters is not none else '—' }}</td>
                 <td class="fm-num">{{ ('%.2f'|format(e.rate)) if e.rate is not none else '—' }}</td>
                 <td class="fm-num fw-semibold">{{ ('%.2f'|format(e.amount)) if e.amount is not none else '—' }}</td>

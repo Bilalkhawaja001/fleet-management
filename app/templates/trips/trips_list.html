@@ -77,7 +77,7 @@
                   data-planned="{{ planned }}"
                   data-vehicle="{{ plate }}"
                   data-driver="{{ driver|lower }}"
-                  data-usage="{{ t.usage_type.value if t.usage_type else '' }}"
+                  data-usage="{{ (t.usage_type.value if t.usage_type is not string and t.usage_type else t.usage_type) or '' }}"
                   data-emp="{{ (dept ~ ' ' ~ emp)|lower }}"
                   data-dest="{{ (t.destination_city or '')|lower }} {{ (t.destination or '')|lower }}"
                   data-origin="{{ origin|lower }}"
@@ -93,7 +93,7 @@
                   <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ origin }}</div>
                   <div class="fw-semibold">{{ dest }}</div>
                 </td>
-                <td>{{ chip((t.usage_type.value if t.usage_type else '-')|replace('_',' ')|title, 'info') }}</td>
+                <td>{{ chip(((t.usage_type.value if t.usage_type is not string and t.usage_type else t.usage_type) or '-')|replace('_',' ')|title, 'info') }}</td>
                 <td>
                   <div class="fw-semibold">{{ dept }}</div>
                   <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ emp }}</div>

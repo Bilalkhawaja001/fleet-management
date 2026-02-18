@@ -43,7 +43,7 @@ class FuelEntry(db.Model):
     company_share_pct = db.Column(db.Integer, nullable=True)  # 0/50/100
     company_amount = db.Column(db.Numeric(12, 2), nullable=True)
 
-    fuel_purpose = db.Column(db.Enum(FuelPurpose), nullable=False, default=FuelPurpose.OFFICIAL, index=True)
+    fuel_purpose = db.Column(db.String(32), nullable=False, default=FuelPurpose.OFFICIAL.value, index=True)
 
     status = db.Column(db.Enum(FuelEntryStatus), nullable=False, default=FuelEntryStatus.PENDING, index=True)
     verified_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)

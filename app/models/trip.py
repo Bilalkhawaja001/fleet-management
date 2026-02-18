@@ -51,7 +51,8 @@ class Trip(db.Model):
     returnable_items_confirmed = db.Column(db.Boolean, nullable=False, default=False)
     returnable_items_confirmed_at = db.Column(db.DateTime, nullable=True)
 
-    usage_type = db.Column(db.Enum(UsageType), nullable=False, default=UsageType.OFFICIAL)
+    # Keep as String for backward/forward compatibility with legacy values
+    usage_type = db.Column(db.String(32), nullable=False, default=UsageType.OFFICIAL.value)
     department = db.Column(db.String(120), nullable=True)
     employee_name = db.Column(db.String(120), nullable=True)
 

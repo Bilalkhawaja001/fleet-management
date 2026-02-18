@@ -150,7 +150,7 @@ def trip_create():
             driver_id=form.driver_id.data,
             odometer_start=form.odometer_start.data,
             time_out=form.time_out.data,
-            usage_type=UsageType(form.usage_type.data),
+            usage_type=UsageType(form.usage_type.data).value,
             department=(form.department.data or "").strip(),
             employee_name=(form.employee_name.data or "").strip(),
             origin=(form.origin.data or "").strip(),
@@ -186,7 +186,7 @@ def trip_edit(trip_id: int):
         driver_id=t.driver_id or 0,
         odometer_start=t.odometer_start,
         time_out=t.time_out,
-        usage_type=t.usage_type.value if t.usage_type else UsageType.OFFICIAL.value,
+        usage_type=(t.usage_type if isinstance(t.usage_type, str) else (t.usage_type.value if t.usage_type else UsageType.OFFICIAL.value)),
         department=t.department or "Centralized",
         employee_name=t.employee_name,
         origin=t.origin or "Nooriabad",
@@ -214,7 +214,7 @@ def trip_edit(trip_id: int):
         t.driver_id = form.driver_id.data
         t.odometer_start = form.odometer_start.data
         t.time_out = form.time_out.data
-        t.usage_type = UsageType(form.usage_type.data)
+        t.usage_type = UsageType(form.usage_type.data).value
         t.department = (form.department.data or "").strip()
         t.employee_name = (form.employee_name.data or "").strip()
         t.origin = (form.origin.data or "").strip()

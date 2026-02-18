@@ -44,7 +44,7 @@ def fuel_list():
     fuel_purpose = (request.args.get("fuel_purpose") or "").strip()
     if fuel_purpose:
         try:
-            q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose))
+            q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose).value)
         except ValueError:
             pass
 
@@ -76,16 +76,17 @@ def fuel_create():
         if trip_id:
             trip = db.session.get(Trip, trip_id)
             if trip and trip.usage_type:
-                if trip.usage_type == UsageType.OFFICIAL:
+                trip_usage = trip.usage_type.value if hasattr(trip.usage_type, "value") else str(trip.usage_type or "")
+                if trip_usage == UsageType.OFFICIAL.value:
                     share_pct = 100
                     fuel_purpose = FuelPurpose.OFFICIAL
-                elif trip.usage_type == UsageType.SCHOOL_VAN:
+                elif trip_usage == UsageType.SCHOOL_VAN.value:
                     share_pct = 50
                     fuel_purpose = FuelPurpose.SCHOOL_VAN
-                elif trip.usage_type == UsageType.EDUCATION:
+                elif trip_usage == UsageType.EDUCATION.value:
                     share_pct = 50
                     fuel_purpose = FuelPurpose.EDUCATION
-                elif trip.usage_type == UsageType.PERSONAL:
+                elif trip_usage == UsageType.PERSONAL.value:
                     share_pct = 0
                     fuel_purpose = FuelPurpose.PERSONAL
 
@@ -118,7 +119,7 @@ def fuel_create():
             amount=form.amount.data,
             company_share_pct=share_pct,
             company_amount=company_amount,
-            fuel_purpose=fuel_purpose,
+            fuel_purpose=fuel_purpose.value,
             status=FuelEntryStatus.PENDING,
         )
         db.session.add(entry)

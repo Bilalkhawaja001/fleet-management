@@ -273,7 +273,7 @@ def fuel_csv():
     if driver_id:
         q = q.filter(FuelEntry.driver_id == driver_id)
     if fuel_purpose:
-        q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose))
+        q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose).value)
 
     logs = q.order_by(FuelEntry.id.desc()).all()
     rows = []
@@ -286,7 +286,7 @@ def fuel_csv():
 
     for l in logs:
         amt = float(l.amount or 0)
-        purpose = l.fuel_purpose.value if l.fuel_purpose else FuelPurpose.OFFICIAL.value
+        purpose = (l.fuel_purpose or FuelPurpose.OFFICIAL.value)
         totals_by_purpose[purpose] = totals_by_purpose.get(purpose, 0.0) + amt
         rows.append(
             [
@@ -330,7 +330,7 @@ def fuel_pdf():
     if driver_id:
         q = q.filter(FuelEntry.driver_id == driver_id)
     if fuel_purpose:
-        q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose))
+        q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose).value)
 
     logs = q.order_by(FuelEntry.id.desc()).all()
     rows = []
@@ -342,7 +342,7 @@ def fuel_pdf():
     }
 
     for l in logs:
-        purpose = l.fuel_purpose.value if l.fuel_purpose else FuelPurpose.OFFICIAL.value
+        purpose = (l.fuel_purpose or FuelPurpose.OFFICIAL.value)
         totals_by_purpose[purpose] = totals_by_purpose.get(purpose, 0.0) + float(l.amount or 0)
         rows.append(
             [
@@ -495,6 +495,7 @@ def preventive_schedules_pdf():
         subtitle=_subtitle(form),
         landscape_mode=True,
     )
+
 
 
 
