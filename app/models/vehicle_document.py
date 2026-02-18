@@ -35,6 +35,10 @@ class VehicleDocument(db.Model):
 
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
+    __table_args__ = (
+        db.Index("ix_vehicle_documents_expiry_status", "expiry_date", "status"),
+    )
+
     vehicle = db.relationship("Vehicle", backref=db.backref("documents", lazy=True))
 
     def __repr__(self) -> str:

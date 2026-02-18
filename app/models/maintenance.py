@@ -54,7 +54,7 @@ class WorkOrder(db.Model):
 
     status = db.Column(db.Enum(WorkOrderStatus), nullable=False, default=WorkOrderStatus.OPEN, index=True)
 
-    opened_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    opened_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
     vehicle_in_workshop_at = db.Column(db.DateTime, nullable=True)
     vehicle_out_workshop_at = db.Column(db.DateTime, nullable=True)
     closed_at = db.Column(db.DateTime, nullable=True)
@@ -68,6 +68,10 @@ class WorkOrder(db.Model):
     description = db.Column(db.Text, nullable=True)
 
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index("ix_work_orders_status_vehicle", "status", "vehicle_id"),
+    )
 
     vehicle = db.relationship("Vehicle", backref=db.backref("work_orders", lazy=True))
 

@@ -4,50 +4,164 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title or "Fleet-Management" }}</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+
+  <!-- App CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
-<body class="bg-light">
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+
+<body>
+<nav class="navbar navbar-expand-lg border-bottom" style="height: var(--fm-topbar-h);">
   <div class="container-fluid">
-    <a class="navbar-brand" href="/dashboard/">Fleet</a>
-    <div class="navbar-nav">
-      <a class="nav-link" href="/dashboard/">Dashboard</a>
-      <a class="nav-link" href="/fleet/vehicles">Vehicles</a>
-      <a class="nav-link" href="/drivers/">Drivers</a>
-      <a class="nav-link" href="/trips/">Trips</a>
-      <a class="nav-link" href="/bookings/">Bookings</a>
-      <a class="nav-link" href="/fuel/">Fuel</a>
-      <a class="nav-link" href="/maintenance/schedules">Maintenance</a>
-      <a class="nav-link" href="/maintenance/work-orders">Work Orders</a>
-      <a class="nav-link" href="/reports/">Reports</a>
-      <a class="nav-link" href="/documents/">Documents</a>
-      <a class="nav-link" href="/incidents/">Incidents</a>
-      {% if current_user.is_authenticated and current_user.role.value == 'super_admin' %}
-        <a class="nav-link" href="/users/">Users</a>
-      {% endif %}
-    </div>
-    <div class="d-flex">
+    <button class="btn btn-outline-secondary d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#fmSidebar" aria-controls="fmSidebar">
+      <i class="bi bi-list"></i>
+    </button>
+
+    <button class="btn btn-outline-secondary d-none d-lg-inline-flex" type="button" id="fmSidebarToggle" aria-label="Toggle sidebar">
+      <i class="bi bi-layout-sidebar"></i>
+    </button>
+
+    <a class="navbar-brand fw-semibold ms-2" href="/dashboard/">
+      <i class="bi bi-truck-front me-1"></i> Fleet
+    </a>
+
+    <div class="ms-auto d-flex align-items-center gap-2">
       {% if current_user.is_authenticated %}
+        <span class="small fm-muted d-none d-md-inline">{{ current_user.username or current_user.email or '' }}</span>
         <form method="post" action="{{ url_for('auth.logout') }}">
-          <button class="btn btn-sm btn-outline-light" type="submit">Logout</button>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+          <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
         </form>
       {% else %}
-        <a class="btn btn-sm btn-outline-light" href="{{ url_for('auth.login') }}">Login</a>
+        <a class="btn btn-sm btn-outline-primary" href="{{ url_for('auth.login') }}">Login</a>
       {% endif %}
     </div>
   </div>
 </nav>
 
-<main class="container py-3">
-  {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-      {% for category, message in messages %}
-        <div class="alert alert-{{ category }}">{{ message }}</div>
-      {% endfor %}
-    {% endif %}
-  {% endwith %}
+<div class="container-fluid fm-shell">
+  <div class="row">
 
-  {% block content %}{% endblock %}
-</main>
+    <!-- Sidebar (desktop) -->
+    <aside class="col-lg-auto p-0 d-none d-lg-block fm-sidebar" id="fmSidebarDesktop">
+      <div class="p-3">
+        <div class="nav flex-column fm-nav">
+          <div class="fm-nav-group">Operations</div>
+          <a class="nav-link" href="/dashboard/"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+          <a class="nav-link" href="/fleet/vehicles"><i class="bi bi-truck"></i><span>Vehicles</span></a>
+          <a class="nav-link" href="/drivers/"><i class="bi bi-person-badge"></i><span>Drivers</span></a>
+          <a class="nav-link" href="/trips/"><i class="bi bi-sign-turn-right"></i><span>Trips</span></a>
+          <a class="nav-link" href="/bookings/"><i class="bi bi-calendar-check"></i><span>Bookings</span></a>
+          <a class="nav-link" href="/fuel/"><i class="bi bi-fuel-pump"></i><span>Fuel</span></a>
+          <a class="nav-link" href="/documents/"><i class="bi bi-folder2-open"></i><span>Documents</span></a>
+          <a class="nav-link" href="/incidents/"><i class="bi bi-exclamation-triangle"></i><span>Incidents</span></a>
+
+          <div class="fm-nav-group mt-3">Maintenance</div>
+          <a class="nav-link" href="/maintenance/schedules"><i class="bi bi-wrench-adjustable"></i><span>Preventive Schedules</span></a>
+          <a class="nav-link" href="/maintenance/work-orders"><i class="bi bi-clipboard-check"></i><span>Work Orders</span></a>
+
+          <div class="fm-nav-group mt-3">Reports</div>
+          <a class="nav-link" href="/reports/"><i class="bi bi-graph-up"></i><span>Exports</span></a>
+
+          {% if current_user.is_authenticated and current_user.role.value == 'super_admin' %}
+            <div class="fm-nav-group mt-3">Admin</div>
+            <a class="nav-link" href="/users/"><i class="bi bi-people"></i><span>Users</span></a>
+          {% endif %}
+        </div>
+      </div>
+    </aside>
+
+    <!-- Sidebar (mobile offcanvas) -->
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="fmSidebar" aria-labelledby="fmSidebarLabel">
+      <div class="offcanvas-header">
+        <div class="offcanvas-title fw-semibold" id="fmSidebarLabel"><i class="bi bi-truck-front me-1"></i> Fleet</div>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body">
+        <div class="nav flex-column fm-nav">
+          <a class="nav-link" href="/dashboard/"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+          <a class="nav-link" href="/fleet/vehicles"><i class="bi bi-truck"></i><span>Vehicles</span></a>
+          <a class="nav-link" href="/drivers/"><i class="bi bi-person-badge"></i><span>Drivers</span></a>
+          <a class="nav-link" href="/trips/"><i class="bi bi-sign-turn-right"></i><span>Trips</span></a>
+          <a class="nav-link" href="/bookings/"><i class="bi bi-calendar-check"></i><span>Bookings</span></a>
+          <a class="nav-link" href="/fuel/"><i class="bi bi-fuel-pump"></i><span>Fuel</span></a>
+          <a class="nav-link" href="/maintenance/schedules"><i class="bi bi-wrench-adjustable"></i><span>Maintenance</span></a>
+          <a class="nav-link" href="/maintenance/work-orders"><i class="bi bi-clipboard-check"></i><span>Work Orders</span></a>
+          <a class="nav-link" href="/documents/"><i class="bi bi-folder2-open"></i><span>Documents</span></a>
+          <a class="nav-link" href="/incidents/"><i class="bi bi-exclamation-triangle"></i><span>Incidents</span></a>
+          <a class="nav-link" href="/reports/"><i class="bi bi-graph-up"></i><span>Reports</span></a>
+          {% if current_user.is_authenticated and current_user.role.value == 'super_admin' %}
+            <hr class="my-2">
+            <div class="small text-uppercase fm-muted px-2 mb-1">Admin</div>
+            <a class="nav-link" href="/users/"><i class="bi bi-people"></i><span>Users</span></a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Content -->
+    <main class="col fm-content py-3">
+      <div class="px-1 px-md-3 fm-content-inner">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert alert-{{ category }} fm-card">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // active link highlight (simple path match)
+  (function(){
+    const path = window.location.pathname;
+    document.querySelectorAll('.fm-nav .nav-link').forEach(a => {
+      const href = a.getAttribute('href');
+      if (!href) return;
+      if (href === path || (href !== '/' && path.startsWith(href))) a.classList.add('active');
+    });
+  })();
+
+  // desktop sidebar collapse (persisted)
+  (function(){
+    const key = 'fm.sidebar.collapsed';
+    const root = document.documentElement;
+    const btn = document.getElementById('fmSidebarToggle');
+
+    function setCollapsed(on){
+      root.dataset.sidebarCollapsed = on ? '1' : '0';
+      try{ localStorage.setItem(key, on ? '1' : '0'); }catch(e){}
+    }
+
+    // init
+    let collapsed = false;
+    try{ collapsed = localStorage.getItem(key) === '1'; }catch(e){}
+    setCollapsed(collapsed);
+
+    if(btn){
+      btn.addEventListener('click', function(){
+        const now = root.dataset.sidebarCollapsed !== '1';
+        setCollapsed(now);
+      });
+    }
+  })();
+</script>
 </body>
 </html>

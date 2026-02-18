@@ -1,6 +1,6 @@
 from flask import Flask
 from .config import Config
-from .extensions import db, migrate, login_manager
+from .extensions import db, migrate, login_manager, csrf, limiter
 
 
 def create_app(config_object=Config):
@@ -10,6 +10,8 @@ def create_app(config_object=Config):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+    csrf.init_app(app)
+    limiter.init_app(app)
 
     # models (ensure imported for migrations)
     from . import models  # noqa: F401
@@ -45,5 +47,13 @@ def create_app(config_object=Config):
     app.register_blueprint(documents_bp)
     app.register_blueprint(incidents_bp)
     app.register_blueprint(bookings_bp)
+
+    @app.after_request
+    def apply_security_headers(response):
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Content-Security-Policy", "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'")
+        return response
 
     return app

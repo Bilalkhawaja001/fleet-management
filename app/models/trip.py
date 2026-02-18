@@ -69,7 +69,11 @@ class Trip(db.Model):
 
     notes = db.Column(db.Text, nullable=True)
 
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        db.Index("ix_trips_status_created", "status", "created_at"),
+    )
 
     vehicle = db.relationship("Vehicle", backref=db.backref("trips", lazy=True))
     driver = db.relationship("Driver", backref=db.backref("trips", lazy=True))

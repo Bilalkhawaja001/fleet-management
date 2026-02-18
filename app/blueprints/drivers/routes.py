@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash
+from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required
 
 from ...extensions import db
@@ -12,8 +12,13 @@ bp = Blueprint("drivers", __name__, url_prefix="/drivers")
 @bp.get("/")
 @login_required
 def driver_list():
-    drivers = Driver.query.order_by(Driver.id.desc()).all()
-    return render_template("drivers/drivers_list.html", drivers=drivers)
+    page = request.args.get("page", 1, type=int)
+    drivers = Driver.query.order_by(Driver.id.desc()).paginate(page=page, per_page=25, error_out=False)
+    return render_template("drivers/drivers_list.html", drivers=drivers.items, pagination=drivers)
+
+
+# Backwards-compatible endpoint alias (some templates may reference drivers.drivers_list)
+bp.add_url_rule("/", endpoint="drivers_list", view_func=driver_list, methods=["GET"])
 
 
 @bp.route("/new", methods=["GET", "POST"])

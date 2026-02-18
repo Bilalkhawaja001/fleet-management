@@ -46,7 +46,11 @@ class FuelEntry(db.Model):
 
     attachment_path = db.Column(db.String(255), nullable=True)
 
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    __table_args__ = (
+        db.Index("ix_fuel_entries_status_date", "status", "fuel_date"),
+    )
 
     vehicle = db.relationship("Vehicle", backref=db.backref("fuel_entries", lazy=True))
     driver = db.relationship("Driver", backref=db.backref("fuel_entries", lazy=True))
