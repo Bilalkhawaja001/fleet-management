@@ -1,51 +1,244 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, table_toolbar, badge, confirm_modal, chip, empty_state %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-0">Trips</h3>
-    <div class="text-muted" style="font-size: 0.9rem;">
-      {% if filter_date %}date={{ filter_date }}{% endif %}
-      {% if filter_status %} {% if filter_date %}·{% endif %} status={{ filter_status }}{% endif %}
-    </div>
-  </div>
-  <div class="d-flex gap-2">
-    <a class="btn btn-sm btn-outline-secondary" href="/trips/">All</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ (filter_date or '') }}&status=planned">Planned</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ (filter_date or '') }}&status=assigned">Assigned</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ (filter_date or '') }}&status=in_transit">In Transit</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ (filter_date or '') }}&status=completed">Completed</a>
-    <a class="btn btn-sm btn-success" href="{{ url_for('trips.trip_create') }}">New</a>
+
+{{ page_header(
+  'Trips',
+  'Trips planning, assignment, and tracking',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('trips.trip_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Trip</a>',
+  secondary=''
+    ~ '<div class="dropdown">'
+    ~ '  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" type="button"><i class="bi bi-download me-1"></i>Export</button>'
+    ~ '  <ul class="dropdown-menu dropdown-menu-end">'
+    ~ '    <li><a class="dropdown-item" href="' ~ url_for('reports.trips_csv') ~ '">Trips (CSV)</a></li>'
+    ~ '    <li><a class="dropdown-item" href="' ~ url_for('reports.trips_pdf') ~ '">Trips (PDF)</a></li>'
+    ~ '  </ul>'
+    ~ '</div>'
+) }}
+
+{{ table_toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:360px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input id="tripQ" class="form-control" placeholder="Search trip id / employee / destination / plate" autocomplete="off">'
+    ~ '</div>'
+    ~ '<input id="tripFrom" class="form-control form-control-sm" type="date" style="max-width:155px;" title="From">'
+    ~ '<input id="tripTo" class="form-control form-control-sm" type="date" style="max-width:155px;" title="To">'
+    ~ '<select id="tripStatus" class="form-select form-select-sm" style="max-width:170px;">'
+    ~ '  <option value="">All Status</option>'
+    ~ '  <option value="planned">Planned</option>'
+    ~ '  <option value="assigned">Assigned</option>'
+    ~ '  <option value="in_transit">In Transit</option>'
+    ~ '  <option value="completed">Completed</option>'
+    ~ '</select>'
+    ~ '<select id="tripVehicle" class="form-select form-select-sm" style="max-width:190px;"><option value="">All Vehicles</option></select>'
+    ~ '<select id="tripDriver" class="form-select form-select-sm" style="max-width:200px;"><option value="">All Drivers</option></select>',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('trips.trip_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if trips and trips|length %}
+      <div class="table-responsive">
+        <table id="tripsTable" class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th data-sort="id" style="width:120px;">Trip No</th>
+              <th data-sort="status" style="width:140px;">Status</th>
+              <th data-sort="planned" style="width:120px;">Planned</th>
+              <th data-sort="vehicle" style="width:120px;">Vehicle</th>
+              <th data-sort="driver" style="width:200px;">Driver</th>
+              <th>Origin → Destination</th>
+              <th data-sort="usage" style="width:160px;">Usage Type</th>
+              <th data-sort="emp" style="width:220px;">Dept / Employee</th>
+              <th data-sort="gate" style="width:170px;">Gatepass</th>
+              <th data-sort="updated" style="width:120px;">Updated</th>
+              <th class="fm-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in trips %}
+              {% set planned = (t.time_out.date().isoformat() if t.time_out else (t.start_at.date().isoformat() if t.start_at else '')) %}
+              {% set updated = (t.created_at.date().isoformat() if t.created_at else '') %}
+              {% set plate = (t.vehicle.plate_no if t.vehicle else '') %}
+              {% set driver = (t.driver.name if t.driver else '') %}
+              {% set origin = (t.origin or '—') %}
+              {% set dest = (t.destination_city or t.destination or '—') %}
+              {% set dept = (t.department or '—') %}
+              {% set emp = (t.employee_name or '—') %}
+
+              {% set gate_label = 'None' %}
+              {% set gate_tone = 'neutral' %}
+              {% if t.carrying_items %}
+                {% if t.items_expected_return_date %}
+                  {% set gate_label = 'Returnable' %}
+                  {% set gate_tone = 'info' %}
+                {% else %}
+                  {% set gate_label = 'Non-returnable' %}
+                  {% set gate_tone = 'warning' %}
+                {% endif %}
+              {% endif %}
+
+              <tr class="fm-row-link"
+                  data-href="{{ url_for('trips.trip_edit', trip_id=t.id) }}"
+                  data-id="{{ t.id }}"
+                  data-status="{{ t.status.value }}"
+                  data-planned="{{ planned }}"
+                  data-vehicle="{{ plate }}"
+                  data-driver="{{ driver|lower }}"
+                  data-usage="{{ t.usage_type.value if t.usage_type else '' }}"
+                  data-emp="{{ (dept ~ ' ' ~ emp)|lower }}"
+                  data-dest="{{ (t.destination_city or '')|lower }} {{ (t.destination or '')|lower }}"
+                  data-origin="{{ origin|lower }}"
+                  data-updated="{{ updated }}"
+                  data-gate="{{ gate_label|lower }}"
+              >
+                <td class="fm-mono fw-semibold">TRP-{{ '%05d'|format(t.id) }}</td>
+                <td>{{ badge(t.status.value) }}</td>
+                <td>{{ planned or '—' }}</td>
+                <td class="fw-semibold">{{ plate or '—' }}</td>
+                <td>{{ driver or '—' }}</td>
+                <td>
+                  <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ origin }}</div>
+                  <div class="fw-semibold">{{ dest }}</div>
+                </td>
+                <td>{{ chip((t.usage_type.value if t.usage_type else '—')|replace('_',' ')|title, 'info') }}</td>
+                <td>
+                  <div class="fw-semibold">{{ dept }}</div>
+                  <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ emp }}</div>
+                </td>
+                <td>{{ chip(gate_label, gate_tone) }}</td>
+                <td>{{ updated or '—' }}</td>
+                <td class="fm-actions" onclick="event.stopPropagation();">
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Trip actions">
+                    <a class="btn btn-outline-secondary btn-icon" title="View" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}"><i class="bi bi-eye"></i></a>
+                    <a class="btn btn-outline-secondary btn-icon" title="Expenses" href="{{ url_for('trips.trip_expenses', trip_id=t.id) }}"><i class="bi bi-receipt"></i></a>
+                    {% if current_user.role.value in ['super_admin','admin'] %}
+                      <form id="trip-del-{{ t.id }}" method="post" action="{{ url_for('trips.trip_delete', trip_id=t.id) }}" style="display:inline-block">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      </form>
+                      <button class="btn btn-outline-danger btn-icon" title="Delete" type="button" data-bs-toggle="modal" data-bs-target="#tripDelModal{{ t.id }}">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                      {{ confirm_modal('tripDelModal' ~ t.id, 'Delete trip', 'This will permanently delete Trip #' ~ t.id ~ '. This action is audited.', 'Delete', 'trip-del-' ~ t.id) }}
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+        (function(){
+          const table = document.getElementById('tripsTable');
+          if(!table) return;
+          const tbody = table.querySelector('tbody');
+
+          const q = document.getElementById('tripQ');
+          const from = document.getElementById('tripFrom');
+          const to = document.getElementById('tripTo');
+          const status = document.getElementById('tripStatus');
+          const veh = document.getElementById('tripVehicle');
+          const drv = document.getElementById('tripDriver');
+
+          // Populate dropdowns from rows (UI-only)
+          const vehicles = new Set();
+          const drivers = new Set();
+          Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const v = (tr.dataset.vehicle || '').trim();
+            const d = (tr.dataset.driver || '').trim();
+            if(v) vehicles.add(v);
+            if(d) drivers.add(d);
+          });
+          Array.from(vehicles).sort().forEach(v => {
+            const o = document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o);
+          });
+          Array.from(drivers).sort().forEach(d => {
+            const o = document.createElement('option'); o.value=d; o.textContent=d; drv.appendChild(o);
+          });
+
+          function inRange(d){
+            if(!d) return true;
+            if(from?.value && d < from.value) return false;
+            if(to?.value && d > to.value) return false;
+            return true;
+          }
+
+          function apply(){
+            const term = (q?.value || '').trim().toLowerCase();
+            const st = (status?.value || '').trim();
+            const v = (veh?.value || '').trim();
+            const dr = (drv?.value || '').trim().toLowerCase();
+
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+              const id = tr.dataset.id || '';
+              const planned = tr.dataset.planned || '';
+              const s = tr.dataset.status || '';
+              const vehicle = tr.dataset.vehicle || '';
+              const driver = tr.dataset.driver || '';
+              const emp = tr.dataset.emp || '';
+              const dest = tr.dataset.dest || '';
+
+              const matchTerm = !term || id.includes(term) || vehicle.toLowerCase().includes(term) || driver.includes(term) || emp.includes(term) || dest.includes(term);
+              const matchStatus = !st || s === st;
+              const matchVeh = !v || vehicle === v;
+              const matchDrv = !dr || driver.includes(dr);
+              const matchDate = inRange(planned);
+
+              tr.style.display = (matchTerm && matchStatus && matchVeh && matchDrv && matchDate) ? '' : 'none';
+            });
+          }
+
+          q?.addEventListener('input', apply);
+          from?.addEventListener('change', apply);
+          to?.addEventListener('change', apply);
+          status?.addEventListener('change', apply);
+          veh?.addEventListener('change', apply);
+          drv?.addEventListener('change', apply);
+
+          // Row click -> view
+          tbody.querySelectorAll('tr[data-href]').forEach(tr => {
+            tr.addEventListener('click', () => {
+              const href = tr.getAttribute('data-href');
+              if(href) window.location.href = href;
+            });
+          });
+
+          // Client-side sorting
+          let sortKey = null; let sortDir = 1;
+          function getVal(tr,key){
+            if(key==='id') return tr.dataset.id.padStart(10,'0');
+            if(key==='status') return tr.dataset.status;
+            if(key==='planned') return tr.dataset.planned || '9999-12-31';
+            if(key==='vehicle') return tr.dataset.vehicle;
+            if(key==='driver') return tr.dataset.driver;
+            if(key==='usage') return tr.dataset.usage;
+            if(key==='emp') return tr.dataset.emp;
+            if(key==='gate') return tr.dataset.gate;
+            if(key==='updated') return tr.dataset.updated;
+            return '';
+          }
+          table.querySelectorAll('thead th[data-sort]').forEach(th => {
+            th.style.cursor='pointer';
+            th.addEventListener('click', () => {
+              const key = th.getAttribute('data-sort');
+              if(sortKey === key) sortDir = -sortDir; else { sortKey=key; sortDir=1; }
+              const rows = Array.from(tbody.querySelectorAll('tr'));
+              rows.sort((a,b)=> getVal(a,key).localeCompare(getVal(b,key)) * sortDir);
+              rows.forEach(r=>tbody.appendChild(r));
+            });
+          });
+        })();
+      </script>
+
+    {% else %}
+      {{ empty_state('bi-sign-turn-right', 'No trips yet', 'Create a trip request to start planning and tracking.', 'New Trip', url_for('trips.trip_create')) }}
+    {% endif %}
+
   </div>
 </div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Status</th><th>Usage</th><th>Vehicle</th><th>Driver</th><th>Route</th><th>Distance (km)</th><th>Total (Rs)</th><th>Fuel Avg (km/L)</th><th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for t in trips %}
-      <tr>
-        <td>{{ t.id }}</td>
-        <td>{{ t.status.value }}</td>
-        <td>{{ t.usage_type.value if t.usage_type else '' }}</td>
-        <td>{{ t.vehicle.plate_no if t.vehicle else '' }}</td>
-        <td>{{ t.driver.name if t.driver else '' }}</td>
-        <td>{{ (t.origin or '') ~ ' → ' ~ (t.destination_city or '') ~ ' → ' ~ (t.destination or '') }}</td>
-        <td>{{ t.distance_km if t.distance_km is not none else '' }}</td>
-        <td>{{ '%.2f'|format(t.total_expenses) if t.total_expenses is not none else '' }}</td>
-        <td>{% if t.fuel_avg_km_per_l %}{{ '%.2f'|format(t.fuel_avg_km_per_l) }}{% endif %}</td>
-        <td>
-          <a class="btn btn-sm btn-outline-primary" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}">Edit</a>
-          <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('trips.trip_expenses', trip_id=t.id) }}">Expenses</a>
-          {% if current_user.role.value in ['super_admin','admin'] %}
-            <form method="post" action="{{ url_for('trips.trip_delete', trip_id=t.id) }}" style="display:inline-block" onsubmit="return confirm('Delete trip?')">
-              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-            </form>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
 {% endblock %}

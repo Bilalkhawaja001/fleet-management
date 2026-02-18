@@ -1,34 +1,202 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, table_toolbar, badge, confirm_modal, empty_state %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Drivers</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('drivers.driver_create') }}">New</a>
+
+{{ page_header(
+  'Drivers',
+  'Driver directory, license validity, and current assignments',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('drivers.driver_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Driver</a>'
+) }}
+
+{{ table_toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:360px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input id="drvQ" class="form-control" placeholder="Search name / phone / license" autocomplete="off">'
+    ~ '</div>'
+    ~ '<select id="drvStatus" class="form-select form-select-sm" style="max-width:180px;">'
+    ~ '  <option value="">All Status</option>'
+    ~ '  <option value="active">Active</option>'
+    ~ '  <option value="inactive">Inactive</option>'
+    ~ '</select>'
+    ~ '<div class="form-check form-switch ms-1">'
+    ~ '  <input class="form-check-input" type="checkbox" role="switch" id="drvExp30">'
+    ~ '  <label class="form-check-label small" for="drvExp30">Expiry < 30d</label>'
+    ~ '</div>',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('drivers.driver_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if drivers and drivers|length %}
+      <div class="table-responsive">
+        <table id="driversTable" class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th data-sort="name">Driver</th>
+              <th data-sort="license">License No</th>
+              <th data-sort="expiry" style="width:170px;">License Expiry</th>
+              <th data-sort="status" style="width:140px;">Status</th>
+              <th style="width:140px;">Assigned Vehicle</th>
+              <th data-sort="updated" style="width:150px;">Updated</th>
+              <th class="fm-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in drivers %}
+              {% set assigned = d.current_vehicles[0].plate_no if d.current_vehicles and d.current_vehicles|length else '' %}
+              <tr
+                data-name="{{ (d.name or '')|lower }}"
+                data-phone="{{ (d.phone or '')|lower }}"
+                data-license="{{ (d.license_no or '')|lower }}"
+                data-status="{{ (d.status or '')|lower }}"
+                data-expiry="{{ d.license_expiry.isoformat() if d.license_expiry else '' }}"
+              >
+                <td>
+                  <div class="fw-semibold">{{ d.name }}</div>
+                  <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ d.phone or '—' }}</div>
+                </td>
+                <td class="fw-semibold">{{ d.license_no or '—' }}</td>
+                <td>
+                  <span class="drv-expiry" data-expiry="{{ d.license_expiry.isoformat() if d.license_expiry else '' }}">
+                    {{ d.license_expiry.isoformat() if d.license_expiry else '—' }}
+                  </span>
+                </td>
+                <td>{{ badge(d.status) }}</td>
+                <td class="fw-semibold">{{ assigned or '—' }}</td>
+                <td data-updated="{{ d.created_at.isoformat() if d.created_at else '' }}">
+                  {{ d.created_at.date().isoformat() if d.created_at else '—' }}
+                </td>
+                <td class="fm-actions">
+                  {% if current_user.role.value in ['super_admin','admin'] %}
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Driver actions">
+                      <a class="btn btn-outline-secondary btn-icon" title="Edit" href="{{ url_for('drivers.driver_edit', driver_id=d.id) }}">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                      <form id="drv-del-{{ d.id }}" method="post" action="{{ url_for('drivers.driver_delete', driver_id=d.id) }}" style="display:inline-block">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      </form>
+                      <button class="btn btn-outline-danger btn-icon" title="Delete" type="button" data-bs-toggle="modal" data-bs-target="#drvDelModal{{ d.id }}">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                    {{ confirm_modal('drvDelModal' ~ d.id, 'Delete driver', 'This will permanently delete driver ' ~ d.name ~ '. This action is audited.', 'Delete', 'drv-del-' ~ d.id) }}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+        (function(){
+          const table = document.getElementById('driversTable');
+          if(!table) return;
+          const tbody = table.querySelector('tbody');
+          const q = document.getElementById('drvQ');
+          const status = document.getElementById('drvStatus');
+          const exp30 = document.getElementById('drvExp30');
+
+          function daysUntil(iso){
+            if(!iso) return null;
+            const d = new Date(iso + 'T00:00:00');
+            if(isNaN(d.getTime())) return null;
+            const now = new Date();
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            return Math.floor((d - today) / (1000*60*60*24));
+          }
+
+          // Expiry chip (<30d) UI-only
+          table.querySelectorAll('.drv-expiry').forEach(el => {
+            const iso = el.getAttribute('data-expiry') || '';
+            const du = daysUntil(iso);
+            if(du === null) return;
+            if(du >= 0 && du < 30){
+              const chip = document.createElement('span');
+              chip.className = 'fm-chip fm-chip-warning ms-2';
+              chip.textContent = 'Expiring';
+              el.appendChild(chip);
+            }
+          });
+
+          function applyFilters(){
+            const term = (q?.value || '').trim().toLowerCase();
+            const st = (status?.value || '').trim().toLowerCase();
+            const onlyExp = !!(exp30 && exp30.checked);
+
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+              const name = tr.dataset.name || '';
+              const phone = tr.dataset.phone || '';
+              const lic = tr.dataset.license || '';
+              const s = tr.dataset.status || '';
+              const expiry = tr.dataset.expiry || '';
+
+              const matchesTerm = !term || name.includes(term) || phone.includes(term) || lic.includes(term);
+              const matchesStatus = !st || s === st;
+
+              let matchesExp = true;
+              if(onlyExp){
+                const du = daysUntil(expiry);
+                matchesExp = (du !== null && du >= 0 && du < 30);
+              }
+
+              tr.style.display = (matchesTerm && matchesStatus && matchesExp) ? '' : 'none';
+            });
+          }
+
+          q?.addEventListener('input', applyFilters);
+          status?.addEventListener('change', applyFilters);
+          exp30?.addEventListener('change', applyFilters);
+
+          // Client-side sorting (Name/Expiry/Status)
+          let sortKey = null;
+          let sortDir = 1;
+
+          function getVal(tr, key){
+            if(key === 'name') return (tr.dataset.name || '');
+            if(key === 'status') return (tr.dataset.status || '');
+            if(key === 'expiry') return (tr.dataset.expiry || '9999-12-31');
+            if(key === 'license') return (tr.dataset.license || '');
+            if(key === 'updated') return tr.querySelector('[data-updated]')?.getAttribute('data-updated') || '';
+            return '';
+          }
+
+          table.querySelectorAll('thead th[data-sort]').forEach(th => {
+            th.style.cursor = 'pointer';
+            th.addEventListener('click', () => {
+              const key = th.getAttribute('data-sort');
+              if(sortKey === key){
+                sortDir = -sortDir;
+              } else {
+                sortKey = key;
+                sortDir = 1;
+              }
+
+              const rows = Array.from(tbody.querySelectorAll('tr'));
+              rows.sort((a,b) => {
+                const av = getVal(a, key);
+                const bv = getVal(b, key);
+                return av.localeCompare(bv) * sortDir;
+              });
+              rows.forEach(r => tbody.appendChild(r));
+            });
+          });
+        })();
+      </script>
+
+    {% else %}
+      {{ empty_state(
+        icon='bi-person-badge',
+        title='No drivers yet',
+        subtitle='Add your first driver to manage assignments and license compliance.',
+        cta_label='New Driver',
+        cta_href=url_for('drivers.driver_create')
+      ) }}
+    {% endif %}
+
+  </div>
 </div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Name</th><th>Phone</th><th>License</th><th>Expiry</th><th>Status</th><th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for d in drivers %}
-      <tr>
-        <td>{{ d.id }}</td>
-        <td>{{ d.name }}</td>
-        <td>{{ d.phone or '' }}</td>
-        <td>{{ d.license_no or '' }}</td>
-        <td>{{ d.license_expiry.isoformat() if d.license_expiry else '' }}</td>
-        <td>{{ d.status }}</td>
-        <td>
-          {% if current_user.role.value in ['super_admin','admin'] %}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('drivers.driver_edit', driver_id=d.id) }}">Edit</a>
-            <form method="post" action="{{ url_for('drivers.driver_delete', driver_id=d.id) }}" style="display:inline-block" onsubmit="return confirm('Delete driver?')">
-              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-            </form>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
 {% endblock %}

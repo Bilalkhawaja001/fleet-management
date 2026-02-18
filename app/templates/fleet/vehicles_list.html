@@ -1,33 +1,124 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, toolbar, badge, confirm_modal %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Vehicles</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('fleet.vehicle_create') }}">New</a>
+
+{{ page_header(
+  'Vehicles',
+  'Manage fleet vehicles, status, and driver assignment',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('fleet.vehicle_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Vehicle</a>'
+) }}
+
+{{ toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:360px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input class="form-control" placeholder="Search by plate or model (coming soon)" disabled>'
+    ~ '</div>',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('fleet.vehicle_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if vehicles and vehicles|length %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th style="width:72px;" class="fm-num">ID</th>
+              <th style="width:140px;">Plate</th>
+              <th>Make / Model</th>
+              <th style="width:90px;" class="fm-num">Year</th>
+              <th style="width:190px;">Category</th>
+              <th style="width:140px;">Status</th>
+              <th class="fm-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in vehicles %}
+              <tr>
+                <td class="fm-num">{{ v.id }}</td>
+                <td class="fw-semibold">{{ v.plate_no }}</td>
+                <td>{{ v.make_model }}</td>
+                <td class="fm-num">{{ v.year or '' }}</td>
+                <td>{{ v.category or 'General' }}</td>
+                <td>{{ badge(v.status) }}</td>
+                <td class="fm-actions">
+                  {% if current_user.role.value in ['super_admin','admin'] %}
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Vehicle actions">
+                      <a class="btn btn-outline-secondary" title="Edit" href="{{ url_for('fleet.vehicle_edit', vehicle_id=v.id) }}">
+                        <i class="bi bi-pencil"></i>
+                      </a>
+                      <form id="veh-del-{{ v.id }}" method="post" action="{{ url_for('fleet.vehicle_delete', vehicle_id=v.id) }}" style="display:inline-block">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                      </form>
+                      <button class="btn btn-outline-danger" title="Delete" type="button" data-bs-toggle="modal" data-bs-target="#vehDelModal{{ v.id }}">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </div>
+                    {{ confirm_modal('vehDelModal' ~ v.id, 'Delete vehicle', 'This will permanently delete vehicle ' ~ v.plate_no ~ '. This action is audited.', 'Delete', 'veh-del-' ~ v.id) }}
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="text-center p-5">
+        <div class="mb-2" style="font-size: 28px; color: var(--fm-muted-2);"><i class="bi bi-truck"></i></div>
+        <div class="fw-semibold">No vehicles yet</div>
+        <div class="fm-muted">Add your first vehicle to start tracking assignments and maintenance.</div>
+        {% if current_user.role.value in ['super_admin','admin','entry_operator'] %}
+          <div class="mt-3">
+            <a class="btn btn-primary btn-sm" href="{{ url_for('fleet.vehicle_create') }}"><i class="bi bi-plus-lg me-1"></i>New Vehicle</a>
+          </div>
+        {% endif %}
+      </div>
+    {% endif %}
+
+  </div>
 </div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Plate</th><th>Make/Model</th><th>Year</th><th>Status</th><th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for v in vehicles %}
-      <tr>
-        <td>{{ v.id }}</td>
-        <td>{{ v.plate_no }}</td>
-        <td>{{ v.make_model }}</td>
-        <td>{{ v.year or '' }}</td>
-        <td>{{ v.status }}</td>
-        <td>
-          {% if current_user.role.value in ['super_admin','admin'] %}
-            <a class="btn btn-sm btn-outline-primary" href="{{ url_for('fleet.vehicle_edit', vehicle_id=v.id) }}">Edit</a>
-            <form method="post" action="{{ url_for('fleet.vehicle_delete', vehicle_id=v.id) }}" style="display:inline-block" onsubmit="return confirm('Delete vehicle?')">
-              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
-            </form>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+
+<script>
+  // Cache vehicle categories for UI-only cross-page filters (e.g., Reports).
+  (function(){
+    const KEY = 'fm.vehicleCategories.v1';
+    const TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+    function plateKey(s){
+      return (s || '').trim().toUpperCase();
+    }
+
+    function isValidCache(obj){
+      if(!obj || obj.v !== 1) return false;
+      if(!obj.ts || typeof obj.ts !== 'number') return false;
+      if(!obj.map || typeof obj.map !== 'object') return false;
+      return (Date.now() - obj.ts) <= TTL;
+    }
+
+    try{
+      // If expired cache exists, overwrite with fresh below.
+      let existing = null;
+      try{ existing = JSON.parse(localStorage.getItem(KEY) || 'null'); }catch(e){}
+      if(existing && !isValidCache(existing)){
+        localStorage.removeItem(KEY);
+      }
+
+      const table = document.querySelector('table');
+      if(!table) return;
+      const map = {};
+      table.querySelectorAll('tbody tr').forEach(tr => {
+        const tds = tr.querySelectorAll('td');
+        if(tds.length < 6) return;
+        const plate = plateKey(tds[1].innerText || '');
+        const cat = (tds[4].innerText || '').trim();
+        if(plate) map[plate] = cat || 'General';
+      });
+
+      localStorage.setItem(KEY, JSON.stringify({ v: 1, ts: Date.now(), map }));
+    }catch(e){}
+  })();
+</script>
 {% endblock %}
