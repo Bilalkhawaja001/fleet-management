@@ -212,11 +212,14 @@
 </div>
 
 <div class="card fm-card mt-3">
-  <div class="card-header fw-semibold">Uploaded Files</div>
+  <div class="card-header fw-semibold d-flex justify-content-between align-items-center gap-2">
+    <span>Uploaded Files</span>
+    <input id="attachmentQ" class="form-control form-control-sm" style="max-width:320px;" placeholder="Search file/type/trip/uploader">
+  </div>
   <div class="card-body p-0">
     {% if attachments and attachments|length %}
       <div class="table-responsive">
-        <table class="table table-hover mb-0">
+        <table id="attachmentTable" class="table table-hover mb-0">
           <thead>
             <tr>
               <th>FileName</th>
@@ -230,7 +233,7 @@
           </thead>
           <tbody>
             {% for a in attachments %}
-              <tr>
+              <tr data-search="{{ (a.display_name or a.original_filename or '')|lower }} {{ (a.mime_type or '')|lower }} {{ (a.uploaded_by.username if a.uploaded_by else '')|lower }} {{ (a.vehicle_document.trip_id|string if a.vehicle_document and a.vehicle_document.trip_id else '')|lower }}">
                 <td class="fw-semibold">{{ a.display_name or a.original_filename }}</td>
                 <td>{{ (a.mime_type or a.stored_filename.split('.')[-1])|upper }}</td>
                 <td>{{ '%.2f MB'|format((a.size_bytes or 0) / 1048576) }}</td>
@@ -258,5 +261,25 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+(function(){
+  const q = document.getElementById('attachmentQ');
+  const table = document.getElementById('attachmentTable');
+  if(!q || !table) return;
+  const rows = Array.from(table.querySelectorAll('tbody tr'));
+
+  q.addEventListener('input', () => {
+    const term = (q.value || '').trim().toLowerCase();
+    let visible = 0;
+    rows.forEach(r => {
+      const hay = r.dataset.search || '';
+      const show = !term || hay.includes(term);
+      r.style.display = show ? '' : 'none';
+      if(show) visible += 1;
+    });
+  });
+})();
+</script>
 
 {% endblock %}

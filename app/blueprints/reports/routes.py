@@ -17,6 +17,13 @@ from .forms import DateRangeForm
 bp = Blueprint("reports", __name__, url_prefix="/reports")
 
 
+def _safe_int_arg(name: str, default: int, min_v: int = 1, max_v: int = 20000) -> int:
+    value = request.args.get(name, default=default, type=int)
+    if value is None:
+        return default
+    return max(min_v, min(max_v, value))
+
+
 def _enum_value(value, default=""):
     if value is None:
         return default
@@ -196,7 +203,8 @@ def trips_csv():
     if driver_id:
         q = q.filter(Trip.driver_id == driver_id)
 
-    trips = q.order_by(Trip.id.desc()).all()
+    max_rows = _safe_int_arg("max_rows", 5000)
+    trips = q.order_by(Trip.id.desc()).limit(max_rows).all()
     rows = []
     for t in trips:
         route = " -> ".join([p for p in [t.origin or "", t.destination_city or "", t.destination or ""] if p])
@@ -260,7 +268,8 @@ def trips_pdf():
     if driver_id:
         q = q.filter(Trip.driver_id == driver_id)
 
-    trips = q.order_by(Trip.id.desc()).all()
+    max_rows = _safe_int_arg("max_rows", 5000)
+    trips = q.order_by(Trip.id.desc()).limit(max_rows).all()
     rows = []
     for t in trips:
         route = " -> ".join([p for p in [t.origin or "", t.destination_city or "", t.destination or ""] if p])
@@ -329,7 +338,8 @@ def fuel_csv():
     if fuel_purpose:
         q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose).value)
 
-    logs = q.order_by(FuelEntry.id.desc()).all()
+    max_rows = _safe_int_arg("max_rows", 5000)
+    logs = q.order_by(FuelEntry.id.desc()).limit(max_rows).all()
     rows = []
     totals_by_purpose: dict[str, float] = {
         FuelPurpose.OFFICIAL.value: 0.0,
@@ -386,7 +396,8 @@ def fuel_pdf():
     if fuel_purpose:
         q = q.filter(FuelEntry.fuel_purpose == FuelPurpose(fuel_purpose).value)
 
-    logs = q.order_by(FuelEntry.id.desc()).all()
+    max_rows = _safe_int_arg("max_rows", 5000)
+    logs = q.order_by(FuelEntry.id.desc()).limit(max_rows).all()
     rows = []
     totals_by_purpose: dict[str, float] = {
         FuelPurpose.OFFICIAL.value: 0.0,
@@ -441,7 +452,8 @@ def work_orders_csv():
     if vehicle_id:
         q = q.filter(WorkOrder.vehicle_id == vehicle_id)
 
-    wos = q.order_by(WorkOrder.id.desc()).all()
+    max_rows = _safe_int_arg("max_rows", 5000)
+    wos = q.order_by(WorkOrder.id.desc()).limit(max_rows).all()
     rows = []
     for wo in wos:
         rows.append(
@@ -472,7 +484,8 @@ def work_orders_pdf():
     if vehicle_id:
         q = q.filter(WorkOrder.vehicle_id == vehicle_id)
 
-    wos = q.order_by(WorkOrder.id.desc()).all()
+    max_rows = _safe_int_arg("max_rows", 5000)
+    wos = q.order_by(WorkOrder.id.desc()).limit(max_rows).all()
     rows = []
     for wo in wos:
         rows.append(
@@ -500,7 +513,8 @@ def preventive_schedules_csv():
     q = PreventiveSchedule.query
     if vehicle_id:
         q = q.filter(PreventiveSchedule.vehicle_id == vehicle_id)
-    schedules = q.order_by(PreventiveSchedule.id.desc()).all()
+    max_rows = _safe_int_arg("max_rows", 5000)
+    schedules = q.order_by(PreventiveSchedule.id.desc()).limit(max_rows).all()
 
     rows = []
     for s in schedules:
@@ -528,7 +542,8 @@ def preventive_schedules_pdf():
     q = PreventiveSchedule.query
     if vehicle_id:
         q = q.filter(PreventiveSchedule.vehicle_id == vehicle_id)
-    schedules = q.order_by(PreventiveSchedule.id.desc()).all()
+    max_rows = _safe_int_arg("max_rows", 5000)
+    schedules = q.order_by(PreventiveSchedule.id.desc()).limit(max_rows).all()
 
     rows = []
     for s in schedules:

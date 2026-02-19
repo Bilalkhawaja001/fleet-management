@@ -1,4 +1,6 @@
-from flask import Flask
+import logging
+
+from flask import Flask, render_template
 from .config import Config
 from .extensions import db, migrate, login_manager, csrf, limiter
 
@@ -6,6 +8,8 @@ from .extensions import db, migrate, login_manager, csrf, limiter
 def create_app(config_object=Config):
     app = Flask(__name__)
     app.config.from_object(config_object)
+
+    logging.basicConfig(level=logging.INFO)
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -55,5 +59,19 @@ def create_app(config_object=Config):
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Content-Security-Policy", "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'")
         return response
+
+    @app.errorhandler(403)
+    def forbidden(_e):
+        return render_template("errors/403.html", title="Access Denied"), 403
+
+    @app.errorhandler(404)
+    def not_found(_e):
+        return render_template("errors/404.html", title="Not Found"), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        app.logger.exception("Unhandled server error", exc_info=e)
+        db.session.rollback()
+        return render_template("errors/500.html", title="Server Error"), 500
 
     return app

@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from flask import Blueprint, abort, current_app, render_template, redirect, url_for, flash, request, send_file
+from sqlalchemy import or_
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
@@ -50,6 +51,8 @@ def doc_list():
             missing_rows=missing_rows,
         )
 
+    q_term = (request.args.get("q") or "").strip()
+
     q = VehicleDocument.query
     if mode == "expiring":
         q = q.filter(
@@ -63,16 +66,38 @@ def doc_list():
             VehicleDocument.expiry_date < today,
         )
 
-    docs = q.order_by(VehicleDocument.expiry_date.asc(), VehicleDocument.id.desc()).all()
-    attachments = DocumentAttachment.query.order_by(DocumentAttachment.created_at.desc()).all()
+    if q_term:
+        q = q.filter(
+            or_(
+                VehicleDocument.doc_name.ilike(f"%{q_term}%"),
+                VehicleDocument.doc_number.ilike(f"%{q_term}%"),
+            )
+        )
+
+    page = request.args.get("page", default=1, type=int) or 1
+    per_page = min(100, request.args.get("per_page", default=25, type=int) or 25)
+    docs_pagination = q.order_by(VehicleDocument.expiry_date.asc(), VehicleDocument.id.desc()).paginate(page=page, per_page=per_page, error_out=False)
+
+    a_q = DocumentAttachment.query
+    if q_term:
+        a_q = a_q.filter(
+            or_(
+                DocumentAttachment.original_filename.ilike(f"%{q_term}%"),
+                DocumentAttachment.display_name.ilike(f"%{q_term}%"),
+            )
+        )
+    attachments = a_q.order_by(DocumentAttachment.created_at.desc()).limit(300).all()
+
     return render_template(
         "documents/doc_list.html",
-        docs=docs,
+        docs=docs_pagination.items,
+        docs_pagination=docs_pagination,
         attachments=attachments,
         mode=mode or "all",
         today=today,
         exp_window_end=exp_window_end,
         missing_rows=[],
+        q_term=q_term,
     )
 
 
