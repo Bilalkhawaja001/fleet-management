@@ -1,7 +1,7 @@
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 
-from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from ...extensions import db
@@ -204,7 +204,7 @@ def trip_list():
 @login_required
 @role_required(Role.SUPER_ADMIN, Role.ADMIN, Role.ENTRY_OPERATOR)
 def trip_create():
-    form = TripForm(status=TripStatus.PLANNED.value, usage_type=UsageType.OFFICIAL.value, department="Centralized", origin="Nooriabad")
+    form = TripForm(status=TripStatus.PLANNED.value, usage_type=UsageType.OFFICIAL.value, department="Centralized", origin="Nooriabad", destination_city="Nooriabad")
     _fill_choices(form)
 
     if form.validate_on_submit():
@@ -222,53 +222,58 @@ def trip_create():
             flash(fuel_err, "danger")
             return render_template("trips/trip_form.html", form=form, title="Quick Trip")
 
-        t = Trip(
-            vehicle_id=form.vehicle_id.data,
-            driver_id=(form.driver_id.data or 0) or None,
-            odometer_start=form.odometer_start.data,
-            time_out=form.time_out.data,
-            usage_type=UsageType(form.usage_type.data).value,
-            department=(form.department.data or "").strip(),
-            employee_name=(form.employee_name.data or "").strip(),
-            origin=(form.origin.data or "").strip(),
-            destination_city=(form.destination_city.data or "").strip(),
-            destination=(form.destination.data or "").strip(),
-            status=TripStatus(form.status.data),
-            notes=(form.notes.data or "").strip() or None,
-        )
-        db.session.add(t)
-        db.session.flush()
-
-        for row in item_rows:
-            db.session.add(TripItem(trip_id=t.id, **row))
-
-        for idx, row in enumerate(fuel_rows, start=1):
-            fuel_note_parts = []
-            if row["fuel_type"]:
-                fuel_note_parts.append(f"Fuel Type: {row['fuel_type'].title()}")
-            if row["notes"]:
-                fuel_note_parts.append(row["notes"])
-            fuel_notes = " | ".join(fuel_note_parts) if fuel_note_parts else None
-
-            db.session.add(
-                FuelEntry(
-                    vehicle_id=t.vehicle_id,
-                    driver_id=t.driver_id,
-                    trip_id=t.id,
-                    slip_no=f"TRIP-{t.id}-{idx}-{int(row['fuel_datetime'].timestamp())}",
-                    fuel_date=row["fuel_datetime"].date(),
-                    liters=row["liters"],
-                    rate=row["rate"],
-                    amount=row["amount"],
-                    fuel_purpose=(t.usage_type.value if hasattr(t.usage_type, "value") else str(t.usage_type or UsageType.OFFICIAL.value)),
-                    status=FuelEntryStatus.PENDING,
-                    reject_reason=fuel_notes,
-                )
+        try:
+            t = Trip(
+                vehicle_id=form.vehicle_id.data,
+                driver_id=(form.driver_id.data or 0) or None,
+                odometer_start=form.odometer_start.data,
+                time_out=form.time_out.data,
+                usage_type=UsageType(form.usage_type.data).value,
+                department=(form.department.data or "").strip(),
+                employee_name=(form.employee_name.data or "").strip(),
+                origin=(form.origin.data or "").strip(),
+                destination_city=((form.destination_city.data or "").strip() or "Nooriabad"),
+                destination=(form.destination.data or "").strip(),
+                status=TripStatus(form.status.data),
+                notes=(form.notes.data or "").strip() or None,
             )
+            db.session.add(t)
+            db.session.flush()
 
-        db.session.commit()
-        flash("Trip saved", "success")
-        return redirect(url_for("trips.trip_list"))
+            for row in item_rows:
+                db.session.add(TripItem(trip_id=t.id, **row))
+
+            for idx, row in enumerate(fuel_rows, start=1):
+                fuel_note_parts = []
+                if row["fuel_type"]:
+                    fuel_note_parts.append(f"Fuel Type: {row['fuel_type'].title()}")
+                if row["notes"]:
+                    fuel_note_parts.append(row["notes"])
+                fuel_notes = " | ".join(fuel_note_parts) if fuel_note_parts else None
+
+                db.session.add(
+                    FuelEntry(
+                        vehicle_id=t.vehicle_id,
+                        driver_id=t.driver_id,
+                        trip_id=t.id,
+                        slip_no=f"TRIP-{t.id}-{idx}-{int(row['fuel_datetime'].timestamp())}",
+                        fuel_date=row["fuel_datetime"].date(),
+                        liters=row["liters"],
+                        rate=row["rate"],
+                        amount=row["amount"],
+                        fuel_purpose=(t.usage_type.value if hasattr(t.usage_type, "value") else str(t.usage_type or UsageType.OFFICIAL.value)),
+                        status=FuelEntryStatus.PENDING,
+                        reject_reason=fuel_notes,
+                    )
+                )
+
+            db.session.commit()
+            flash("Trip saved", "success")
+            return redirect(url_for("trips.trip_list"))
+        except Exception as exc:
+            db.session.rollback()
+            current_app.logger.exception("Trip save failed in trip_create", extra={"vehicle_id": form.vehicle_id.data, "driver_id": (form.driver_id.data or 0) or None})
+            flash(f"Trip save failed: {exc}", "danger")
 
     return render_template("trips/trip_form.html", form=form, title="Quick Trip")
 
@@ -291,7 +296,7 @@ def trip_edit(trip_id: int):
         department=t.department or "Centralized",
         employee_name=t.employee_name,
         origin=t.origin or "Nooriabad",
-        destination_city=t.destination_city,
+        destination_city=t.destination_city or "Nooriabad",
         destination=t.destination,
         status=t.status.value,
         notes=t.notes,
@@ -317,7 +322,7 @@ def trip_edit(trip_id: int):
         t.department = (form.department.data or "").strip()
         t.employee_name = (form.employee_name.data or "").strip()
         t.origin = (form.origin.data or "").strip()
-        t.destination_city = (form.destination_city.data or "").strip()
+        t.destination_city = ((form.destination_city.data or "").strip() or "Nooriabad")
         t.destination = (form.destination.data or "").strip()
         t.status = TripStatus(form.status.data)
         t.notes = (form.notes.data or "").strip() or None

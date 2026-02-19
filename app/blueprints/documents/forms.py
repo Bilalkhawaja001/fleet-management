@@ -1,12 +1,14 @@
 from flask_wtf import FlaskForm
-from wtforms import SelectField, StringField, DateField, SubmitField
+from flask_wtf.file import FileAllowed
+from wtforms import SelectField, StringField, DateField, SubmitField, MultipleFileField
 from wtforms.validators import DataRequired, Optional
 
-from ...models import VehicleDocType
+from ...models import Trip, VehicleDocType
 
 
 class VehicleDocumentForm(FlaskForm):
     vehicle_id = SelectField("Vehicle", coerce=int, validators=[DataRequired()])
+    trip_id = SelectField("Trip", coerce=int, validators=[Optional()])
     doc_type = SelectField(
         "Document Type",
         choices=[(d.value, d.name.title()) for d in VehicleDocType],
@@ -16,4 +18,8 @@ class VehicleDocumentForm(FlaskForm):
     doc_number = StringField("Doc Number", validators=[Optional()])
     issue_date = DateField("Issue Date", validators=[Optional()], format="%Y-%m-%d")
     expiry_date = DateField("Expiry Date", validators=[DataRequired()], format="%Y-%m-%d")
+    attachments = MultipleFileField(
+        "Attachments",
+        validators=[FileAllowed(["pdf", "jpg", "jpeg", "png", "webp"], "Only pdf/jpg/jpeg/png/webp allowed")],
+    )
     submit = SubmitField("Save")

@@ -7,6 +7,7 @@ from .trip_item import TripItem, ItemOwnership, ItemUom, ItemReturnType
 from .fuel_log import FuelLog
 from .fuel_entry import FuelEntry, FuelEntryStatus, FuelPurpose, FuelType
 from .vehicle_document import VehicleDocument, VehicleDocType, VehicleDocStatus
+from .document_attachment import DocumentAttachment
 from .vehicle_booking import VehicleBooking, BookingStatus
 from .notification import Notification, NotificationType, NotificationSeverity
 from .maintenance_plan2 import MaintenancePlan, ScheduleMode
@@ -38,6 +39,7 @@ __all__ = [
     "VehicleDocument",
     "VehicleDocType",
     "VehicleDocStatus",
+    "DocumentAttachment",
     "VehicleBooking",
     "BookingStatus",
     "Notification",

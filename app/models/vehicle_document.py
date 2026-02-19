@@ -32,6 +32,7 @@ class VehicleDocument(db.Model):
 
     status = db.Column(db.Enum(VehicleDocStatus), nullable=False, default=VehicleDocStatus.ACTIVE, index=True)
     attachment_path = db.Column(db.String(255), nullable=True)
+    trip_id = db.Column(db.Integer, db.ForeignKey("trips.id"), nullable=True, index=True)
 
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
@@ -40,6 +41,7 @@ class VehicleDocument(db.Model):
     )
 
     vehicle = db.relationship("Vehicle", backref=db.backref("documents", lazy=True))
+    trip = db.relationship("Trip", backref=db.backref("documents", lazy=True))
 
     def __repr__(self) -> str:
         return f"<VehicleDocument {self.vehicle_id} {self.doc_type} {self.status}>"

@@ -36,3 +36,8 @@ class Config:
     RATELIMIT_DEFAULT = "200 per day;50 per hour"
     RATELIMIT_STORAGE_URI = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
     RATELIMIT_HEADERS_ENABLED = True
+
+    # Document uploads
+    DOCUMENT_ALLOWED_EXTENSIONS = {"pdf", "jpg", "jpeg", "png", "webp"}
+    DOCUMENT_MAX_FILE_SIZE_MB = int(os.getenv("DOCUMENT_MAX_FILE_SIZE_MB", "10"))
+    DOCUMENT_UPLOAD_BASE = os.getenv("DOCUMENT_UPLOAD_BASE", "uploads/trips")

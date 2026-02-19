@@ -8,6 +8,7 @@ from ...models import TripStatus, UsageType
 
 
 CITIES = [
+    ("Nooriabad", "Nooriabad"),
     ("Karachi", "Karachi"),
     ("Lahore", "Lahore"),
     ("Islamabad", "Islamabad"),
@@ -46,7 +47,7 @@ class TripForm(FlaskForm):
     employee_name = StringField("Employee Name", validators=[Optional(), Length(max=120)])
 
     origin = StringField("Origin", validators=[DataRequired(), Length(min=2, max=120)], default="Nooriabad")
-    destination_city = SelectField("Destination City", choices=CITIES, validators=[DataRequired()])
+    destination_city = SelectField("Destination City", choices=CITIES, validators=[DataRequired()], default="Nooriabad")
     destination = StringField("Destination", validators=[DataRequired(), Length(min=2, max=160)])
 
     time_out = DateTimeLocalField("Planned Time Out", validators=[DataRequired()], format="%Y-%m-%dT%H:%M")
