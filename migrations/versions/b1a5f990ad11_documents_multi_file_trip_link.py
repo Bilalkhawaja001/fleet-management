@@ -1,7 +1,7 @@
 """documents multi file trip link
 
 Revision ID: b1a5f990ad11
-Revises: e17b3f9ac201
+Revises: a2b4ce778d91
 Create Date: 2026-02-19 13:20:00
 """
 
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "b1a5f990ad11"
-down_revision = "e17b3f9ac201"
+down_revision = "a2b4ce778d91"
 branch_labels = None
 depends_on = None
 

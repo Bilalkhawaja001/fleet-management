@@ -1,9 +1,12 @@
 import csv
 import io
 from datetime import datetime, date, time
+from pathlib import Path
+from uuid import uuid4
 
-from flask import Blueprint, render_template, Response, send_file, request
+from flask import Blueprint, current_app, flash, render_template, Response, send_file, request
 from flask_login import login_required
+from werkzeug.utils import secure_filename
 
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.pdfgen import canvas
@@ -12,6 +15,35 @@ from ...models import Trip, FuelEntry, FuelPurpose, WorkOrder, Vehicle, Driver, 
 from .forms import DateRangeForm
 
 bp = Blueprint("reports", __name__, url_prefix="/reports")
+
+
+def _validate_report_upload(file_storage):
+    if not file_storage or not getattr(file_storage, "filename", None):
+        return None, None
+
+    safe_name = secure_filename(file_storage.filename)
+    if not safe_name:
+        raise ValueError("Invalid upload filename")
+
+    ext = safe_name.rsplit('.', 1)[-1].lower() if '.' in safe_name else ''
+    allowed = {"pdf", "csv", "jpg", "jpeg", "png", "webp"}
+    if ext not in allowed:
+        raise ValueError("Unsupported upload type. Allowed: pdf,csv,jpg,jpeg,png,webp")
+
+    max_size_mb = 10
+    max_size_bytes = max_size_mb * 1024 * 1024
+    file_storage.stream.seek(0, 2)
+    size_bytes = file_storage.stream.tell()
+    file_storage.stream.seek(0)
+    if size_bytes > max_size_bytes:
+        raise ValueError(f"Upload exceeds {max_size_mb}MB limit")
+
+    upload_dir = Path(current_app.root_path).parent / "uploads" / "reports"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    stored_name = f"{uuid4().hex}_{safe_name}"
+    out_path = upload_dir / stored_name
+    file_storage.save(out_path)
+    return safe_name, str(out_path)
 
 
 def _parse_date_range():
@@ -45,15 +77,31 @@ def _parse_date_range():
     if driver_id == 0:
         driver_id = None
 
-    fuel_purpose = (form.fuel_purpose.data or "").strip() or None
+    fuel_purpose_raw = (form.fuel_purpose.data or "").strip().lower()
+    allowed_purpose = {p.value for p in FuelPurpose}
+    fuel_purpose = fuel_purpose_raw if fuel_purpose_raw in allowed_purpose else None
 
     return form, start_dt, end_dt, vehicle_id, driver_id, fuel_purpose
 
 
-@bp.get("/")
+@bp.route("/", methods=["GET", "POST"])
 @login_required
 def index():
     form, _, _, _, _, _ = _parse_date_range()
+
+    if request.method == "POST":
+        try:
+            upload = request.files.get("report_file") or request.files.get("file")
+            original_name, stored_path = _validate_report_upload(upload)
+            if original_name:
+                flash(f"Report upload received: {original_name}", "success")
+                current_app.logger.info("Report upload saved", extra={"filename": original_name, "path": stored_path})
+            else:
+                flash("No file selected. Filters are still applied.", "info")
+        except Exception as exc:
+            current_app.logger.exception("Reports upload failed")
+            flash(f"Report upload failed: {exc}", "danger")
+
     return render_template("reports/index.html", form=form)
 
 
