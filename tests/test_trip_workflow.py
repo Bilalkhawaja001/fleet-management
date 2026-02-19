@@ -2,7 +2,7 @@ import re
 
 from app import create_app
 from app.extensions import db
-from app.models import Driver, ItemOwnership, Role, Trip, TripExpense, TripItem, TripStatus, UsageType, User, Vehicle
+from app.models import Driver, FuelEntry, ItemOwnership, Role, Trip, TripExpense, TripItem, TripStatus, UsageType, User, Vehicle
 
 
 class TripWorkflowTestConfig:
@@ -118,6 +118,108 @@ def test_trip_create_saves_personal_items_minimal():
     with app.app_context():
         t = Trip.query.order_by(Trip.id.desc()).first()
         assert TripItem.query.filter(TripItem.trip_id == t.id).count() == 1
+
+
+def test_quick_trip_submit_without_employee_name_passes():
+    app = create_app(TripWorkflowTestConfig)
+    with app.app_context():
+        db.drop_all(); db.create_all()
+        vehicle_id, driver_id = _seed_user_vehicle_driver()
+
+    client = app.test_client(); _login(client)
+    token = _extract_csrf(client.get('/trips/new').get_data(as_text=True))
+
+    res = client.post('/trips/new', data={
+        'csrf_token': token,
+        'usage_type': UsageType.OFFICIAL.value,
+        'department': 'Centralized',
+        'employee_name': '',
+        'origin': 'Nooriabad',
+        'destination_city': 'Karachi',
+        'destination': 'Head Office',
+        'time_out': '2026-02-18T10:00',
+        'vehicle_id': str(vehicle_id),
+        'driver_id': str(driver_id),
+        'odometer_start': '1000',
+        'status': TripStatus.PLANNED.value,
+    }, follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        t = Trip.query.order_by(Trip.id.desc()).first()
+        assert t is not None
+        assert (t.employee_name or '') == ''
+
+
+def test_quick_trip_submit_without_driver_passes():
+    app = create_app(TripWorkflowTestConfig)
+    with app.app_context():
+        db.drop_all(); db.create_all()
+        vehicle_id, _ = _seed_user_vehicle_driver()
+
+    client = app.test_client(); _login(client)
+    token = _extract_csrf(client.get('/trips/new').get_data(as_text=True))
+
+    res = client.post('/trips/new', data={
+        'csrf_token': token,
+        'usage_type': UsageType.OFFICIAL.value,
+        'department': 'Centralized',
+        'employee_name': 'Bilal',
+        'origin': 'Nooriabad',
+        'destination_city': 'Karachi',
+        'destination': 'Head Office',
+        'time_out': '2026-02-18T10:00',
+        'vehicle_id': str(vehicle_id),
+        'driver_id': '0',
+        'odometer_start': '1000',
+        'status': TripStatus.PLANNED.value,
+    }, follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        t = Trip.query.order_by(Trip.id.desc()).first()
+        assert t is not None
+        assert t.driver_id is None
+
+
+def test_quick_trip_with_fuel_rows_saves_correctly():
+    app = create_app(TripWorkflowTestConfig)
+    with app.app_context():
+        db.drop_all(); db.create_all()
+        vehicle_id, driver_id = _seed_user_vehicle_driver()
+
+    client = app.test_client(); _login(client)
+    token = _extract_csrf(client.get('/trips/new').get_data(as_text=True))
+
+    res = client.post('/trips/new', data={
+        'csrf_token': token,
+        'usage_type': UsageType.OFFICIAL.value,
+        'department': 'Centralized',
+        'employee_name': 'Bilal',
+        'origin': 'Nooriabad',
+        'destination_city': 'Karachi',
+        'destination': 'Head Office',
+        'time_out': '2026-02-18T10:00',
+        'vehicle_id': str(vehicle_id),
+        'driver_id': str(driver_id),
+        'odometer_start': '1000',
+        'status': TripStatus.PLANNED.value,
+        'fuel_datetime[]': ['2026-02-18T10:30'],
+        'fuel_type[]': ['diesel'],
+        'fuel_liters[]': ['20'],
+        'fuel_rate[]': ['275'],
+        'fuel_amount[]': ['5500'],
+        'fuel_notes[]': ['Pump station'],
+    }, follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        t = Trip.query.order_by(Trip.id.desc()).first()
+        assert t is not None
+        fuel_rows = FuelEntry.query.filter(FuelEntry.trip_id == t.id).all()
+        assert len(fuel_rows) == 1
+        assert float(fuel_rows[0].liters) == 20.0
+        assert float(fuel_rows[0].amount) == 5500.0
 
 
 def test_end_plus_requires_return_confirmation_for_returnables():

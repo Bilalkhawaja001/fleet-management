@@ -67,7 +67,7 @@
               {% set dest = (t.destination_city or t.destination or '-') %}
               {% set dept = (t.department or '-') %}
               {% set emp = (t.employee_name or '-') %}
-              {% set can_end = t.status.value in ['assigned', 'in_transit'] %}
+              {% set can_end = t.status.value != 'completed' %}
               {% set returnable_count = (t.trip_items | selectattr('return_type.value', 'equalto', 'returnable') | list | length) if t.trip_items else 0 %}
 
               <tr class="fm-row-link"
@@ -101,10 +101,9 @@
                 <td>{{ updated or '-' }}</td>
                 <td class="fm-actions" onclick="event.stopPropagation();">
                   <div class="btn-group btn-group-sm" role="group" aria-label="Trip actions">
-                    <a class="btn btn-outline-secondary btn-icon" title="View" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}"><i class="bi bi-eye"></i></a>
                     <button
-                      class="btn btn-outline-primary btn-icon js-end-trip"
-                      title="End +"
+                      class="btn btn-primary btn-icon js-end-trip"
+                      title="End Trip"
                       type="button"
                       data-bs-toggle="modal"
                       data-bs-target="#endTripModal"
@@ -113,8 +112,9 @@
                       data-has-returnable="{{ 1 if returnable_count > 0 else 0 }}"
                       {% if not can_end %}disabled{% endif %}
                     >
-                      End +
+                      End Trip
                     </button>
+                    <a class="btn btn-outline-secondary btn-icon" title="View" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}"><i class="bi bi-eye"></i></a>
                     <a class="btn btn-outline-secondary btn-icon" title="Expenses" href="{{ url_for('trips.trip_expenses', trip_id=t.id) }}"><i class="bi bi-receipt"></i></a>
                     {% if current_user.role.value in ['super_admin','admin'] %}
                       <form id="trip-del-{{ t.id }}" method="post" action="{{ url_for('trips.trip_delete', trip_id=t.id) }}" style="display:inline-block">
@@ -138,7 +138,7 @@
           <div class="modal-content">
             <form id="endTripForm" method="post">
               <div class="modal-header">
-                <h5 class="modal-title">End + Items</h5>
+                <h5 class="modal-title">End Trip</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
               <div class="modal-body">
@@ -281,13 +281,12 @@
               currentTripId = btn.dataset.tripId;
               currentStartOdo = parseInt(btn.dataset.startOdo || '0', 10) || 0;
               const hasReturnable = (btn.dataset.hasReturnable || '0') === '1';
-              returnConfirmation.required = hasReturnable;
               endTripForm.action = `/trips/${currentTripId}/end-plus`;
               endTime.value = nowLocal();
               endOdo.value = '';
               runningKm.value = '';
               returnConfirmation.checked = false;
-              returnConfirmation.required = false;
+              returnConfirmation.required = hasReturnable;
               errBox.classList.add('d-none');
               errBox.textContent = '';
             });

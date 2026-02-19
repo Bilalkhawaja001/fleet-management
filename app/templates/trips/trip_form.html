@@ -40,6 +40,13 @@
           <option value="Spinning"></option>
         </datalist>
 
+        <hr>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Fuel Entry (Optional)</h6>
+          <button class="btn btn-sm btn-outline-secondary" type="button" id="addFuelRow"><i class="bi bi-plus-lg me-1"></i>Add Fuel Row</button>
+        </div>
+        <div id="fuelRows"></div>
+
         <div class="d-flex gap-2 pt-3 justify-content-end">
           {{ form.submit(class_='btn btn-primary') }}
           <a class="btn btn-outline-secondary" href="{{ url_for('trips.trip_list') }}">Back</a>
@@ -53,6 +60,8 @@
 (function(){
   const rows = document.getElementById('itemRows');
   const addBtn = document.getElementById('addItemRow');
+  const fuelRows = document.getElementById('fuelRows');
+  const addFuelBtn = document.getElementById('addFuelRow');
 
   function toggleCompanyFields(row){
     const own = row.querySelector('select[name="item_ownership[]"]')?.value;
@@ -125,7 +134,72 @@
     toggleCompanyFields(row);
   }
 
+  function nowLocal(){
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function addFuelRow(){
+    const row = document.createElement('div');
+    row.className = 'border rounded p-2 mb-2 fuel-row';
+    row.innerHTML = `
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label">Fuel Date/Time</label>
+          <input type="datetime-local" name="fuel_datetime[]" class="form-control" value="${nowLocal()}">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Fuel Type</label>
+          <select name="fuel_type[]" class="form-select">
+            <option value="">--</option>
+            <option value="petrol">Petrol</option>
+            <option value="diesel">Diesel</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Liters</label>
+          <input type="number" step="0.01" min="0" name="fuel_liters[]" class="form-control" placeholder="Required if row added">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Rate</label>
+          <input type="number" step="0.01" min="0" name="fuel_rate[]" class="form-control" placeholder="Optional">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label">Amount</label>
+          <input type="number" step="0.01" min="0" name="fuel_amount[]" class="form-control" placeholder="Auto-calc">
+        </div>
+        <div class="col-md-1">
+          <button type="button" class="btn btn-outline-danger btn-sm w-100 remove-fuel-row">×</button>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Notes</label>
+          <input type="text" name="fuel_notes[]" class="form-control" placeholder="Optional">
+        </div>
+      </div>
+    `;
+
+    const litersInput = row.querySelector('input[name="fuel_liters[]"]');
+    const rateInput = row.querySelector('input[name="fuel_rate[]"]');
+    const amountInput = row.querySelector('input[name="fuel_amount[]"]');
+
+    function recalcAmount(){
+      const liters = parseFloat(litersInput.value || '');
+      const rate = parseFloat(rateInput.value || '');
+      if(!Number.isNaN(liters) && !Number.isNaN(rate)){
+        amountInput.value = (liters * rate).toFixed(2);
+      }
+    }
+
+    litersInput.addEventListener('input', recalcAmount);
+    rateInput.addEventListener('input', recalcAmount);
+    row.querySelector('.remove-fuel-row').addEventListener('click', () => row.remove());
+
+    fuelRows.appendChild(row);
+  }
+
   addBtn?.addEventListener('click', addItemRow);
+  addFuelBtn?.addEventListener('click', addFuelRow);
 })();
 </script>
 

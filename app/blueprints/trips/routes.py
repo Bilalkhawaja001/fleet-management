@@ -1,11 +1,11 @@
 from datetime import date, datetime, time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required
 
 from ...extensions import db
-from ...models import FuelEntry, Role, Trip, TripExpense, TripExpenseType, TripItem, ItemOwnership, ItemUom, ItemReturnType, TripStatus, UsageType, Vehicle, Driver
+from ...models import FuelEntry, FuelEntryStatus, Role, Trip, TripExpense, TripExpenseType, TripItem, ItemOwnership, ItemUom, ItemReturnType, TripStatus, UsageType, Vehicle, Driver
 from ...rbac import role_required
 from .expense_forms import TripExpenseForm
 from .forms import EndTripForm, TripForm
@@ -22,7 +22,7 @@ def _fill_choices(form: TripForm):
 
 
 def _editable_statuses():
-    return {TripStatus.ASSIGNED, TripStatus.IN_TRANSIT}
+    return {TripStatus.PLANNED, TripStatus.ASSIGNED, TripStatus.IN_TRANSIT}
 
 
 def _parse_trip_items_or_error():
@@ -97,6 +97,81 @@ def _parse_trip_items_or_error():
     return rows, None
 
 
+def _parse_trip_fuel_rows_or_error():
+    fuel_datetimes = request.form.getlist("fuel_datetime[]")
+    fuel_types = request.form.getlist("fuel_type[]")
+    liters_values = request.form.getlist("fuel_liters[]")
+    rate_values = request.form.getlist("fuel_rate[]")
+    amount_values = request.form.getlist("fuel_amount[]")
+    notes_values = request.form.getlist("fuel_notes[]")
+
+    rows = []
+    fuel_row_count = max(
+        len(fuel_datetimes), len(fuel_types), len(liters_values), len(rate_values), len(amount_values), len(notes_values)
+    )
+
+    for i in range(fuel_row_count):
+        dt_raw = (fuel_datetimes[i] if i < len(fuel_datetimes) else "").strip()
+        fuel_type = (fuel_types[i] if i < len(fuel_types) else "").strip().lower()
+        liters_raw = (liters_values[i] if i < len(liters_values) else "").strip()
+        rate_raw = (rate_values[i] if i < len(rate_values) else "").strip()
+        amount_raw = (amount_values[i] if i < len(amount_values) else "").strip()
+        notes_raw = (notes_values[i] if i < len(notes_values) else "").strip()
+
+        if not any([dt_raw, fuel_type, liters_raw, rate_raw, amount_raw, notes_raw]):
+            continue
+
+        if not liters_raw:
+            return None, f"Liters are required at fuel row {i + 1}"
+
+        try:
+            liters = Decimal(liters_raw)
+        except InvalidOperation:
+            return None, f"Invalid liters at fuel row {i + 1}"
+
+        if liters <= 0:
+            return None, f"Liters must be > 0 at fuel row {i + 1}"
+
+        rate = None
+        if rate_raw:
+            try:
+                rate = Decimal(rate_raw)
+            except InvalidOperation:
+                return None, f"Invalid rate at fuel row {i + 1}"
+            if rate < 0:
+                return None, f"Rate must be >= 0 at fuel row {i + 1}"
+
+        amount = None
+        if amount_raw:
+            try:
+                amount = Decimal(amount_raw)
+            except InvalidOperation:
+                return None, f"Invalid amount at fuel row {i + 1}"
+            if amount < 0:
+                return None, f"Amount must be >= 0 at fuel row {i + 1}"
+
+        if amount is None and rate is not None:
+            amount = (rate * liters).quantize(Decimal("0.01"))
+
+        try:
+            fuel_dt = datetime.fromisoformat(dt_raw) if dt_raw else datetime.now()
+        except ValueError:
+            return None, f"Invalid fuel date/time at row {i + 1}"
+
+        rows.append(
+            {
+                "fuel_datetime": fuel_dt,
+                "fuel_type": fuel_type,
+                "liters": liters,
+                "rate": rate,
+                "amount": amount,
+                "notes": notes_raw,
+            }
+        )
+
+    return rows, None
+
+
 @bp.get("/")
 @login_required
 def trip_list():
@@ -136,18 +211,20 @@ def trip_create():
         if (form.vehicle_id.data or 0) == 0:
             flash("Vehicle is required", "danger")
             return render_template("trips/trip_form.html", form=form, title="Quick Trip")
-        if (form.driver_id.data or 0) == 0:
-            flash("Driver is required", "danger")
-            return render_template("trips/trip_form.html", form=form, title="Quick Trip")
 
         item_rows, item_err = _parse_trip_items_or_error()
         if item_err:
             flash(item_err, "danger")
             return render_template("trips/trip_form.html", form=form, title="Quick Trip")
 
+        fuel_rows, fuel_err = _parse_trip_fuel_rows_or_error()
+        if fuel_err:
+            flash(fuel_err, "danger")
+            return render_template("trips/trip_form.html", form=form, title="Quick Trip")
+
         t = Trip(
             vehicle_id=form.vehicle_id.data,
-            driver_id=form.driver_id.data,
+            driver_id=(form.driver_id.data or 0) or None,
             odometer_start=form.odometer_start.data,
             time_out=form.time_out.data,
             usage_type=UsageType(form.usage_type.data).value,
@@ -164,6 +241,30 @@ def trip_create():
 
         for row in item_rows:
             db.session.add(TripItem(trip_id=t.id, **row))
+
+        for idx, row in enumerate(fuel_rows, start=1):
+            fuel_note_parts = []
+            if row["fuel_type"]:
+                fuel_note_parts.append(f"Fuel Type: {row['fuel_type'].title()}")
+            if row["notes"]:
+                fuel_note_parts.append(row["notes"])
+            fuel_notes = " | ".join(fuel_note_parts) if fuel_note_parts else None
+
+            db.session.add(
+                FuelEntry(
+                    vehicle_id=t.vehicle_id,
+                    driver_id=t.driver_id,
+                    trip_id=t.id,
+                    slip_no=f"TRIP-{t.id}-{idx}-{int(row['fuel_datetime'].timestamp())}",
+                    fuel_date=row["fuel_datetime"].date(),
+                    liters=row["liters"],
+                    rate=row["rate"],
+                    amount=row["amount"],
+                    fuel_purpose=(t.usage_type.value if hasattr(t.usage_type, "value") else str(t.usage_type or UsageType.OFFICIAL.value)),
+                    status=FuelEntryStatus.PENDING,
+                    reject_reason=fuel_notes,
+                )
+            )
 
         db.session.commit()
         flash("Trip saved", "success")
@@ -201,9 +302,7 @@ def trip_edit(trip_id: int):
         if (form.vehicle_id.data or 0) == 0:
             flash("Vehicle is required", "danger")
             return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
-        if (form.driver_id.data or 0) == 0:
-            flash("Driver is required", "danger")
-            return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
+        # Driver is optional in merged trip workflow.
 
         item_rows, item_err = _parse_trip_items_or_error()
         if item_err:
@@ -211,7 +310,7 @@ def trip_edit(trip_id: int):
             return render_template("trips/trip_form.html", form=form, title=f"Edit Trip #{t.id}")
 
         t.vehicle_id = form.vehicle_id.data
-        t.driver_id = form.driver_id.data
+        t.driver_id = (form.driver_id.data or 0) or None
         t.odometer_start = form.odometer_start.data
         t.time_out = form.time_out.data
         t.usage_type = UsageType(form.usage_type.data).value

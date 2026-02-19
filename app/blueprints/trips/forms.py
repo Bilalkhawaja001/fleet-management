@@ -43,7 +43,7 @@ class TripForm(FlaskForm):
     )
 
     department = SelectField("Department", choices=DEPARTMENTS, validators=[DataRequired()])
-    employee_name = StringField("Employee Name", validators=[DataRequired(), Length(min=2, max=120)])
+    employee_name = StringField("Employee Name", validators=[Optional(), Length(max=120)])
 
     origin = StringField("Origin", validators=[DataRequired(), Length(min=2, max=120)], default="Nooriabad")
     destination_city = SelectField("Destination City", choices=CITIES, validators=[DataRequired()])
@@ -52,7 +52,7 @@ class TripForm(FlaskForm):
     time_out = DateTimeLocalField("Planned Time Out", validators=[DataRequired()], format="%Y-%m-%dT%H:%M")
 
     vehicle_id = SelectField("Vehicle", coerce=int, validators=[DataRequired()])
-    driver_id = SelectField("Driver", coerce=int, validators=[DataRequired()])
+    driver_id = SelectField("Driver", coerce=int, validators=[Optional()])
     odometer_start = IntegerField("Start Odometer", validators=[DataRequired(), NumberRange(min=0)])
 
     notes = TextAreaField("Notes", validators=[Optional(), Length(max=1000)])
