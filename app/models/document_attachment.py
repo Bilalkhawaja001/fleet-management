@@ -14,6 +14,9 @@ class DocumentAttachment(db.Model):
     storage_path = db.Column(db.String(500), nullable=False)
     mime_type = db.Column(db.String(120), nullable=True)
     size_bytes = db.Column(db.Integer, nullable=False)
+    display_name = db.Column(db.String(255), nullable=True)
+    notes = db.Column(db.Text, nullable=True)
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
 
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
 
@@ -21,6 +24,7 @@ class DocumentAttachment(db.Model):
         "VehicleDocument",
         backref=db.backref("attachments", lazy=True, cascade="all, delete-orphan"),
     )
+    uploaded_by = db.relationship("User", foreign_keys=[uploaded_by_user_id])
 
     def __repr__(self) -> str:
         return f"<DocumentAttachment {self.id} {self.original_filename}>"

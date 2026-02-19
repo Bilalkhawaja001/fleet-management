@@ -2,14 +2,14 @@ from datetime import date, timedelta
 from pathlib import Path
 from uuid import uuid4
 
-from flask import Blueprint, current_app, render_template, redirect, url_for, flash, request
-from flask_login import login_required
+from flask import Blueprint, abort, current_app, render_template, redirect, url_for, flash, request, send_file
+from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
 from ...extensions import db
 from ...models import DocumentAttachment, Vehicle, VehicleDocument, VehicleDocStatus, VehicleDocType, Role, Trip
 from ...rbac import role_required
-from .forms import VehicleDocumentForm
+from .forms import DocumentAttachmentEditForm, VehicleDocumentForm
 
 bp = Blueprint("documents", __name__, url_prefix="/documents")
 
@@ -43,6 +43,7 @@ def doc_list():
         return render_template(
             "documents/doc_list.html",
             docs=[],
+            attachments=[],
             mode=mode,
             today=today,
             exp_window_end=exp_window_end,
@@ -63,9 +64,11 @@ def doc_list():
         )
 
     docs = q.order_by(VehicleDocument.expiry_date.asc(), VehicleDocument.id.desc()).all()
+    attachments = DocumentAttachment.query.order_by(DocumentAttachment.created_at.desc()).all()
     return render_template(
         "documents/doc_list.html",
         docs=docs,
+        attachments=attachments,
         mode=mode or "all",
         today=today,
         exp_window_end=exp_window_end,
@@ -120,6 +123,8 @@ def _store_attachments(files, trip_id: int | None, vehicle_document_id: int):
                 storage_path=rel_path,
                 mime_type=getattr(f, "mimetype", None),
                 size_bytes=size_bytes,
+                display_name=original_name,
+                uploaded_by_user_id=getattr(current_user, "id", None),
             )
         )
 
@@ -172,3 +177,102 @@ def doc_create():
             flash(f"Document save failed: {exc}", "danger")
 
     return render_template("documents/doc_form.html", form=form, title="New Vehicle Document")
+
+
+def _attachment_path_or_404(attachment: DocumentAttachment) -> Path:
+    root = Path(current_app.root_path).parent.resolve()
+    full_path = (root / attachment.storage_path).resolve()
+    if root not in full_path.parents and full_path != root:
+        abort(403)
+    return full_path
+
+
+@bp.get("/<int:id>")
+@login_required
+def attachment_view(id: int):
+    a = db.session.get(DocumentAttachment, id)
+    if not a:
+        flash("Document file not found", "warning")
+        return redirect(url_for("documents.doc_list"))
+
+    mimetype = (a.mime_type or "").lower()
+    is_image = mimetype.startswith("image/") or a.stored_filename.lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+    is_pdf = mimetype == "application/pdf" or a.stored_filename.lower().endswith(".pdf")
+    return render_template("documents/doc_file_detail.html", attachment=a, is_image=is_image, is_pdf=is_pdf)
+
+
+@bp.get("/<int:id>/download")
+@login_required
+def attachment_download(id: int):
+    a = db.session.get(DocumentAttachment, id)
+    if not a:
+        flash("Document file not found", "warning")
+        return redirect(url_for("documents.doc_list"))
+
+    path = _attachment_path_or_404(a)
+    if not path.exists():
+        flash("File is missing on disk", "danger")
+        return redirect(url_for("documents.doc_list"))
+
+    ext = path.suffix.lower()
+    inline_requested = (request.args.get("inline") or "").strip() in {"1", "true", "yes"}
+    as_attachment = True
+    if ext in {".jpg", ".jpeg", ".png", ".webp"} and inline_requested:
+        as_attachment = False
+    if ext == ".pdf" and inline_requested:
+        as_attachment = False
+
+    return send_file(path, as_attachment=as_attachment, download_name=(a.display_name or a.original_filename or path.name), mimetype=a.mime_type or None)
+
+
+@bp.route("/<int:id>/edit", methods=["GET", "POST"])
+@login_required
+@role_required(Role.SUPER_ADMIN, Role.ADMIN, Role.ENTRY_OPERATOR)
+def attachment_edit(id: int):
+    a = db.session.get(DocumentAttachment, id)
+    if not a:
+        flash("Document file not found", "warning")
+        return redirect(url_for("documents.doc_list"))
+
+    form = DocumentAttachmentEditForm(display_name=a.display_name, notes=a.notes, trip_id=(a.vehicle_document.trip_id or 0))
+    form.trip_id.choices = [(0, "-- Optional --")]
+    form.trip_id.choices += [(t.id, f"TRP-{t.id:05d} {t.origin or ''} -> {t.destination_city or t.destination or ''}") for t in Trip.query.order_by(Trip.id.desc()).limit(300).all()]
+
+    if form.validate_on_submit():
+        try:
+            a.display_name = (form.display_name.data or "").strip() or a.original_filename
+            a.notes = (form.notes.data or "").strip() or None
+            a.vehicle_document.trip_id = (form.trip_id.data or 0) or None
+            db.session.commit()
+            flash("Document metadata updated", "success")
+            return redirect(url_for("documents.attachment_view", id=a.id))
+        except Exception:
+            db.session.rollback()
+            current_app.logger.exception("Document metadata update failed")
+            flash("Document metadata update failed", "danger")
+
+    return render_template("documents/doc_file_edit.html", form=form, attachment=a)
+
+
+@bp.post("/<int:id>/delete")
+@login_required
+@role_required(Role.SUPER_ADMIN, Role.ADMIN, Role.ENTRY_OPERATOR)
+def attachment_delete(id: int):
+    a = db.session.get(DocumentAttachment, id)
+    if not a:
+        flash("Document file not found", "warning")
+        return redirect(url_for("documents.doc_list"))
+
+    try:
+        path = _attachment_path_or_404(a)
+        if path.exists():
+            path.unlink()
+        db.session.delete(a)
+        db.session.commit()
+        flash("Document deleted", "success")
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Document delete failed")
+        flash("Document delete failed", "danger")
+
+    return redirect(url_for("documents.doc_list"))

@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header %}
+{% block content %}
+
+{{ page_header('Document File', attachment.display_name or attachment.original_filename) }}
+
+<div class="card fm-card">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-6"><strong>Type:</strong> {{ attachment.mime_type or '-' }}</div>
+      <div class="col-md-6"><strong>Size:</strong> {{ '%.2f MB'|format((attachment.size_bytes or 0) / 1048576) }}</div>
+      <div class="col-md-6"><strong>Uploaded:</strong> {{ attachment.created_at.strftime('%Y-%m-%d %H:%M') if attachment.created_at else '-' }}</div>
+      <div class="col-md-6"><strong>Uploaded By:</strong> {{ attachment.uploaded_by.username if attachment.uploaded_by else '-' }}</div>
+      <div class="col-md-12"><strong>Notes:</strong> {{ attachment.notes or '-' }}</div>
+    </div>
+
+    <hr>
+    {% if is_image %}
+      <img src="{{ url_for('documents.attachment_download', id=attachment.id, inline=1) }}" alt="preview" class="img-fluid rounded border">
+    {% elif is_pdf %}
+      <a class="btn btn-outline-secondary" target="_blank" href="{{ url_for('documents.attachment_download', id=attachment.id, inline=1) }}">Open PDF</a>
+    {% else %}
+      <div class="fm-muted">Preview not available for this file type.</div>
+    {% endif %}
+
+    <div class="d-flex gap-2 mt-3">
+      <a class="btn btn-primary" href="{{ url_for('documents.attachment_download', id=attachment.id) }}">Download</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('documents.attachment_edit', id=attachment.id) }}">Edit Metadata</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('documents.doc_list') }}">Back</a>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

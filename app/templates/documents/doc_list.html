@@ -211,4 +211,52 @@
   </div>
 </div>
 
+<div class="card fm-card mt-3">
+  <div class="card-header fw-semibold">Uploaded Files</div>
+  <div class="card-body p-0">
+    {% if attachments and attachments|length %}
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>FileName</th>
+              <th>Type</th>
+              <th>Size</th>
+              <th>UploadedAt</th>
+              <th>UploadedBy</th>
+              <th>Trip</th>
+              <th class="fm-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in attachments %}
+              <tr>
+                <td class="fw-semibold">{{ a.display_name or a.original_filename }}</td>
+                <td>{{ (a.mime_type or a.stored_filename.split('.')[-1])|upper }}</td>
+                <td>{{ '%.2f MB'|format((a.size_bytes or 0) / 1048576) }}</td>
+                <td>{{ a.created_at.strftime('%Y-%m-%d %H:%M') if a.created_at else '-' }}</td>
+                <td>{{ a.uploaded_by.username if a.uploaded_by else '-' }}</td>
+                <td>{{ ('TRP-' ~ '%05d'|format(a.vehicle_document.trip_id)) if a.vehicle_document and a.vehicle_document.trip_id else '-' }}</td>
+                <td class="fm-actions">
+                  <div class="btn-group btn-group-sm">
+                    <a class="btn btn-outline-secondary" href="{{ url_for('documents.attachment_view', id=a.id) }}">View</a>
+                    <a class="btn btn-outline-primary" href="{{ url_for('documents.attachment_download', id=a.id) }}">Download</a>
+                    <a class="btn btn-outline-secondary" href="{{ url_for('documents.attachment_edit', id=a.id) }}">Edit</a>
+                    <form method="post" action="{{ url_for('documents.attachment_delete', id=a.id) }}" onsubmit="return confirm('Delete this file?');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-outline-danger" type="submit">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="p-3 fm-muted">No uploaded files yet.</div>
+    {% endif %}
+  </div>
+</div>
+
 {% endblock %}

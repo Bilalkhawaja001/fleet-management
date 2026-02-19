@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileAllowed
-from wtforms import SelectField, StringField, DateField, SubmitField, MultipleFileField
+from wtforms import SelectField, StringField, DateField, SubmitField, MultipleFileField, TextAreaField
 from wtforms.validators import DataRequired, Optional
 
 from ...models import Trip, VehicleDocType
@@ -22,4 +22,11 @@ class VehicleDocumentForm(FlaskForm):
         "Attachments",
         validators=[FileAllowed(["pdf", "jpg", "jpeg", "png", "webp"], "Only pdf/jpg/jpeg/png/webp allowed")],
     )
+    submit = SubmitField("Save")
+
+
+class DocumentAttachmentEditForm(FlaskForm):
+    display_name = StringField("Display Name", validators=[Optional()])
+    notes = TextAreaField("Notes", validators=[Optional()])
+    trip_id = SelectField("Trip", coerce=int, validators=[Optional()])
     submit = SubmitField("Save")
