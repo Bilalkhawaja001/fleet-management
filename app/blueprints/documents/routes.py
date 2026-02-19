@@ -7,6 +7,7 @@ from sqlalchemy import or_
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from ...audit import log_audit
 from ...extensions import db
 from ...models import DocumentAttachment, Vehicle, VehicleDocument, VehicleDocStatus, VehicleDocType, Role, Trip
 from ...rbac import role_required
@@ -193,6 +194,17 @@ def doc_create():
             if attachments:
                 doc.attachment_path = attachments[0].storage_path
 
+            db.session.add(log_audit("documents", "create", "vehicle_document", doc.id, {
+                "vehicle_id": doc.vehicle_id,
+                "trip_id": doc.trip_id,
+                "attachments_count": len(attachments),
+            }))
+            for a in attachments:
+                db.session.add(log_audit("documents", "create", "document_attachment", a.id, {
+                    "document_id": doc.id,
+                    "filename": a.original_filename,
+                }))
+
             db.session.commit()
             flash(f"Document saved with {len(attachments)} attachment(s)", "success")
             return redirect(url_for("documents.doc_list"))
@@ -268,6 +280,10 @@ def attachment_edit(id: int):
             a.display_name = (form.display_name.data or "").strip() or a.original_filename
             a.notes = (form.notes.data or "").strip() or None
             a.vehicle_document.trip_id = (form.trip_id.data or 0) or None
+            db.session.add(log_audit("documents", "update", "document_attachment", a.id, {
+                "trip_id": a.vehicle_document.trip_id,
+                "display_name": a.display_name,
+            }))
             db.session.commit()
             flash("Document metadata updated", "success")
             return redirect(url_for("documents.attachment_view", id=a.id))
@@ -289,6 +305,9 @@ def attachment_delete(id: int):
         return redirect(url_for("documents.doc_list"))
 
     try:
+        attachment_id = a.id
+        document_id = a.vehicle_document_id
+        original_filename = a.original_filename
         path = _attachment_path_or_404(a)
         file_cleanup_warning = False
         if path.exists():
@@ -298,6 +317,11 @@ def attachment_delete(id: int):
                 file_cleanup_warning = True
                 current_app.logger.exception("Document physical file could not be removed (locked)")
         db.session.delete(a)
+        db.session.add(log_audit("documents", "delete", "document_attachment", attachment_id, {
+            "document_id": document_id,
+            "filename": original_filename,
+            "file_locked": file_cleanup_warning,
+        }))
         db.session.commit()
         if file_cleanup_warning:
             flash("Document metadata deleted. Physical file was locked and could not be removed now.", "warning")

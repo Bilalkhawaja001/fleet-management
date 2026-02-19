@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
 
+from ...audit import log_audit
 from ...extensions import db
 from datetime import datetime
 
@@ -123,6 +124,13 @@ def fuel_create():
             status=FuelEntryStatus.PENDING,
         )
         db.session.add(entry)
+        db.session.flush()
+        db.session.add(log_audit("fuel", "create", "fuel_entry", entry.id, {
+            "trip_id": entry.trip_id,
+            "vehicle_id": entry.vehicle_id,
+            "amount": str(entry.amount or ""),
+            "status": getattr(entry.status, "value", entry.status),
+        }))
         db.session.commit()
         flash("Fuel entry added", "success")
         return redirect(url_for("fuel.fuel_list"))
@@ -146,6 +154,10 @@ def fuel_verify(id):
     entry.status = FuelEntryStatus.VERIFIED
     entry.verified_by_user_id = current_user.id
     entry.verified_at = datetime.utcnow()
+    db.session.add(log_audit("fuel", "verify", "fuel_entry", entry.id, {
+        "verified_by": current_user.id,
+        "status": getattr(entry.status, "value", entry.status),
+    }))
     db.session.commit()
     flash("Fuel entry verified successfully", "success")
     return redirect(url_for("fuel.fuel_list"))
@@ -167,6 +179,10 @@ def fuel_reject(id):
     entry.status = FuelEntryStatus.REJECTED
     entry.verified_by_user_id = current_user.id
     entry.verified_at = datetime.utcnow()
+    db.session.add(log_audit("fuel", "reject", "fuel_entry", entry.id, {
+        "verified_by": current_user.id,
+        "status": getattr(entry.status, "value", entry.status),
+    }))
     db.session.commit()
     flash("Fuel entry rejected", "info")
     return redirect(url_for("fuel.fuel_list"))

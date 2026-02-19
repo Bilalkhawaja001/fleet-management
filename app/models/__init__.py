@@ -14,6 +14,7 @@ from .maintenance_plan2 import MaintenancePlan, ScheduleMode
 from .maintenance import PreventiveSchedule, WorkOrder, WorkOrderStatus, WorkOrderType, WorkSource, Part
 from .work_order_item import WorkOrderItem, JobType
 from .incident import Incident, IncidentAttachment, IncidentStatus, IncidentType, IncidentSeverity, ClaimStatus
+from .audit_log import AuditLog
 
 __all__ = [
     "User",
@@ -61,4 +62,5 @@ __all__ = [
     "IncidentType",
     "IncidentSeverity",
     "ClaimStatus",
+    "AuditLog",
 ]

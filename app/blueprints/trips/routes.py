@@ -2,8 +2,9 @@ from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
 
 from flask import Blueprint, current_app, flash, jsonify, redirect, render_template, request, url_for
-from flask_login import login_required
+from flask_login import current_user, login_required
 
+from ...audit import log_audit
 from ...extensions import db
 from ...models import FuelEntry, FuelEntryStatus, Role, Trip, TripExpense, TripExpenseType, TripItem, ItemOwnership, ItemUom, ItemReturnType, TripStatus, UsageType, Vehicle, Driver
 from ...rbac import role_required
@@ -267,6 +268,11 @@ def trip_create():
                     )
                 )
 
+            db.session.add(log_audit("trips", "create", "trip", t.id, {
+                "vehicle_id": t.vehicle_id,
+                "driver_id": t.driver_id,
+                "status": getattr(t.status, "value", t.status),
+            }))
             db.session.commit()
             flash("Trip saved", "success")
             return redirect(url_for("trips.trip_list"))
@@ -331,6 +337,11 @@ def trip_edit(trip_id: int):
         for row in item_rows:
             db.session.add(TripItem(trip_id=t.id, **row))
 
+        db.session.add(log_audit("trips", "update", "trip", t.id, {
+            "vehicle_id": t.vehicle_id,
+            "driver_id": t.driver_id,
+            "status": getattr(t.status, "value", t.status),
+        }))
         db.session.commit()
         flash("Trip updated", "success")
         return redirect(url_for("trips.trip_list"))
@@ -448,6 +459,11 @@ def trip_end(trip_id: int):
     for x in expense_items:
         db.session.add(x)
 
+    db.session.add(log_audit("trips", "end", "trip", t.id, {
+        "end_odometer": t.end_odometer,
+        "running_km": t.running_km,
+        "status": getattr(t.status, "value", t.status),
+    }))
     db.session.commit()
 
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -522,6 +538,9 @@ def trip_delete(trip_id: int):
         TripItem.query.filter(TripItem.trip_id == t.id).delete(synchronize_session=False)
 
         db.session.delete(t)
+        db.session.add(log_audit("trips", "delete", "trip", trip_id, {
+            "deleted_by": getattr(current_user, "id", None),
+        }))
         db.session.commit()
         flash("Trip deleted", "success")
     except Exception as exc:
