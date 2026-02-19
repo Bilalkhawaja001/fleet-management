@@ -1,38 +1,135 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, badge, chip %}
 {% block content %}
-<h3 class="mb-3">{{ title }}</h3>
-<form method="post">
-  {{ form.hidden_tag() }}
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      {{ form.vehicle_id.label(class_='form-label') }}
-      {{ form.vehicle_id(class_='form-select') }}
-    </div>
-    <div class="col-md-6 mb-3">
-      {{ form.doc_type.label(class_='form-label') }}
-      {{ form.doc_type(class_='form-select') }}
+
+{{ page_header(title, 'Create a document record (safe, audit-ready)') }}
+
+<div class="row g-3">
+  <div class="col-12 col-xl-8">
+    <form method="post" class="card fm-card" id="docForm">
+      <div class="card-body">
+        {{ form.hidden_tag() }}
+
+        <div class="accordion" id="docAcc">
+
+          <!-- Core -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hCore">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cCore" aria-expanded="true" aria-controls="cCore">Core</button>
+            </h2>
+            <div id="cCore" class="accordion-collapse collapse show" aria-labelledby="hCore" data-bs-parent="#docAcc">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Title <span class="text-danger">*</span></label>
+                    {{ form.doc_name(class_='form-control', required=True, placeholder='e.g., Insurance Policy / Permit') }}
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Doc No</label>
+                    {{ form.doc_number(class_='form-control fm-mono', id='docNo', placeholder='DOC-12345') }}
+                  </div>
+                  <div class="col-md-6">
+                    {{ form.doc_type.label(class_='form-label') }}
+                    {{ form.doc_type(class_='form-select') }}
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Date <span class="text-danger">*</span></label>
+                    {{ form.issue_date(class_='form-control', type='date', required=True) }}
+                  </div>
+                  <div class="col-md-3">
+                    {{ form.expiry_date.label(class_='form-label') }}
+                    {{ form.expiry_date(class_='form-control', type='date') }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Linking -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hLink">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cLink" aria-expanded="true" aria-controls="cLink">Linking</button>
+            </h2>
+            <div id="cLink" class="accordion-collapse collapse show" aria-labelledby="hLink" data-bs-parent="#docAcc">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    {{ form.vehicle_id.label(class_='form-label') }}
+                    {{ form.vehicle_id(class_='form-select') }}
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Trip</label>
+                    <input class="form-control" value="—" disabled>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Work Order</label>
+                    <input class="form-control" value="—" disabled>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- File -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hFile">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cFile" aria-expanded="true" aria-controls="cFile">File</button>
+            </h2>
+            <div id="cFile" class="accordion-collapse collapse show" aria-labelledby="hFile" data-bs-parent="#docAcc">
+              <div class="accordion-body">
+                <div class="fm-muted">File upload is not implemented on this screen yet.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hNotes">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cNotes" aria-expanded="false" aria-controls="cNotes">Notes</button>
+            </h2>
+            <div id="cNotes" class="accordion-collapse collapse" aria-labelledby="hNotes" data-bs-parent="#docAcc">
+              <div class="accordion-body">
+                <div class="fm-muted">Notes field is not available in backend.</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="d-flex gap-2 pt-3 justify-content-end">
+          {{ form.submit(class_='btn btn-primary') }}
+          <a class="btn btn-outline-secondary" href="{{ url_for('documents.doc_list') }}">Back</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-12 col-xl-4">
+    <div class="card fm-card fm-rail">
+      <div class="card-header fw-semibold">Summary</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Status</div>
+          <div>{{ badge('active') }}</div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Linked</div>
+          <div class="fw-semibold" id="railVeh">Vehicle</div>
+        </div>
+        <div class="d-grid gap-2 mt-3">
+          <button class="btn btn-primary" type="submit" form="docForm">Save</button>
+          <button class="btn btn-outline-secondary" type="button" disabled>Archive (Not implemented)</button>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      {{ form.doc_name.label(class_='form-label') }}
-      {{ form.doc_name(class_='form-control') }}
-    </div>
-    <div class="col-md-6 mb-3">
-      {{ form.doc_number.label(class_='form-label') }}
-      {{ form.doc_number(class_='form-control') }}
-    </div>
-  </div>
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      {{ form.issue_date.label(class_='form-label') }}
-      {{ form.issue_date(class_='form-control', type='date') }}
-    </div>
-    <div class="col-md-6 mb-3">
-      {{ form.expiry_date.label(class_='form-label') }}
-      {{ form.expiry_date(class_='form-control', type='date') }}
-    </div>
-  </div>
-  {{ form.submit(class_='btn btn-primary') }}
-</form>
+</div>
+
+<script>
+  (function(){
+    const docNo = document.getElementById('docNo');
+    docNo?.addEventListener('input', () => { docNo.value = (docNo.value||'').toUpperCase(); });
+  })();
+</script>
+
 {% endblock %}

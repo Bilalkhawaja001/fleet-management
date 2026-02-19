@@ -1,126 +1,182 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, badge, chip %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-0">Dashboard</h3>
-    <div class="text-muted" style="font-size: 0.9rem;">Trip Start Date (time_out): {{ today.isoformat() }}</div>
+
+{{ page_header('Dashboard', 'Enterprise command center · ' ~ today.isoformat()) }}
+
+<!-- Alert summary strip (subtle) -->
+<div class="fm-alert-strip mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <span class="fm-muted small fw-semibold">Alerts:</span>
+    {% if fuel_pending %}{{ chip(fuel_pending ~ ' fuel pending', 'warning') }}{% endif %}
+    {% if docs_expired %}{{ chip(docs_expired ~ ' docs expired', 'danger') }}{% endif %}
+    {% if docs_expiring %}{{ chip(docs_expiring ~ ' docs expiring', 'warning') }}{% endif %}
+    {% if incidents_open %}{{ chip(incidents_open ~ ' incidents open', 'warning') }}{% endif %}
+    {% if (not fuel_pending) and (not docs_expired) and (not docs_expiring) and (not incidents_open) %}
+      <span class="fm-muted">No critical alerts.</span>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="/reports/"><i class="bi bi-download me-1"></i>Exports</a>
+    <a class="btn btn-sm btn-outline-secondary" href="/fleet/vehicles"><i class="bi bi-truck me-1"></i>Fleet</a>
   </div>
 </div>
 
-<div class="row g-3 mb-3">
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
-        <div class="text-muted">Trips Today</div>
-        <div class="fs-3 fw-bold">{{ trips_today_total }}</div>
-        <div style="font-size: 0.85rem;" class="text-muted">
-          planned {{ trips_today_by_status.get('planned', 0) }} ·
-          assigned {{ trips_today_by_status.get('assigned', 0) }} ·
-          in_transit {{ trips_today_by_status.get('in_transit', 0) }} ·
-          completed {{ trips_today_by_status.get('completed', 0) }}
-        </div>
+<!-- KPI strip -->
+<div class="row g-2 mb-3 fm-kpi-strip">
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card fm-card fm-kpi-card">
+      <div class="card-body py-3">
+        <div class="fm-kpi-label">Trips Today</div>
+        <div class="fm-kpi-number">{{ trips_today_total }}</div>
+        <div class="fm-kpi-sub">Planned {{ trips_today_by_status.get('planned', 0) }} · Assigned {{ trips_today_by_status.get('assigned', 0) }} · In transit {{ trips_today_by_status.get('in_transit', 0) }} · Completed {{ trips_today_by_status.get('completed', 0) }}</div>
         <a class="stretched-link" href="/trips/?date={{ today.isoformat() }}"></a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
-        <div class="text-muted">Work Orders (Open)</div>
-        <div class="fs-3 fw-bold">{{ open_work_orders }}</div>
-        <div style="font-size: 0.85rem;" class="text-muted">Vehicles under maintenance: {{ vehicles_under_maintenance }}</div>
-        <a class="stretched-link" href="/maintenance/work-orders?status=open"></a>
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card fm-card fm-kpi-card">
+      <div class="card-body py-3">
+        <div class="fm-kpi-label">Work Orders</div>
+        <div class="fm-kpi-number">{{ open_work_orders }}</div>
+        <div class="fm-kpi-sub">Vehicles under maintenance: {{ vehicles_under_maintenance }}</div>
+        <a class="stretched-link" href="/maintenance/work-orders"></a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
-        <div class="text-muted">Fuel Pending Verification</div>
-        <div class="fs-3 fw-bold">{{ fuel_pending }}</div>
-        <a class="stretched-link" href="/fuel/?status=pending"></a>
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card fm-card fm-kpi-card">
+      <div class="card-body py-3">
+        <div class="fm-kpi-label">Fuel Pending</div>
+        <div class="fm-kpi-number">{{ fuel_pending }}</div>
+        <div class="fm-kpi-sub">Verification queue</div>
+        <a class="stretched-link" href="/fuel/"></a>
       </div>
     </div>
   </div>
 
-  <div class="col-md-3">
-    <div class="card">
-      <div class="card-body">
-        <div class="text-muted">Documents</div>
-        <div style="font-size: 0.95rem;">
-          <div>Expiring (0–30): <span class="fw-bold">{{ docs_expiring }}</span> <a href="/documents/?mode=expiring" class="ms-1">open</a></div>
-          <div>Expired: <span class="fw-bold text-danger">{{ docs_expired }}</span> <a href="/documents/?mode=expired" class="ms-1">open</a></div>
-          <div>Missing (vehicles): <span class="fw-bold text-warning">{{ missing_docs_vehicles }}</span> <a href="/documents/?mode=missing" class="ms-1">open</a></div>
-        </div>
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="card fm-card fm-kpi-card">
+      <div class="card-body py-3">
+        <div class="fm-kpi-label">Compliance</div>
+        <div class="fm-kpi-number">{{ docs_expired + docs_expiring }}</div>
+        <div class="fm-kpi-sub">Expired {{ docs_expired }} · Expiring {{ docs_expiring }} · Missing vehicles {{ missing_docs_vehicles }}</div>
         <a class="stretched-link" href="/documents/?mode=expiring"></a>
       </div>
     </div>
   </div>
 </div>
 
-<div class="row g-3 mb-3">
-  <div class="col-md-3">
-    <div class="card">
+<!-- Fleet health row -->
+<div class="row g-2 mb-3">
+  <div class="col-12 col-lg-4">
+    <div class="card fm-card">
       <div class="card-body">
-        <div class="text-muted">Fleet</div>
-        <div class="d-flex justify-content-between">
-          <div>Vehicles</div><div class="fw-bold">{{ vehicles_total }}</div>
-        </div>
-        <div class="d-flex justify-content-between">
-          <div>Inside Mill</div><div class="fw-bold">{{ vehicles_inside }}</div>
-        </div>
-        <div class="d-flex justify-content-between">
-          <div>Outside</div><div class="fw-bold">{{ vehicles_outside }}</div>
-        </div>
-        <div class="d-flex justify-content-between">
-          <div>Drivers</div><div class="fw-bold">{{ drivers_total }}</div>
-        </div>
-        <a class="stretched-link" href="/fleet/vehicles"></a>
+        <div class="fw-semibold">Fleet Health</div>
+        <div class="fm-muted" style="font-size: var(--fm-muted-size);">Current availability snapshot</div>
+        <div class="mt-2 d-flex justify-content-between"><span class="fm-muted">Vehicles</span><span class="fw-semibold">{{ vehicles_total }}</span></div>
+        <div class="d-flex justify-content-between"><span class="fm-muted">Inside</span><span class="fw-semibold">{{ vehicles_inside }}</span></div>
+        <div class="d-flex justify-content-between"><span class="fm-muted">Outside</span><span class="fw-semibold">{{ vehicles_outside }}</span></div>
       </div>
     </div>
   </div>
 
-  <div class="col-md-3">
-    <div class="card">
+  <div class="col-12 col-lg-4">
+    <div class="card fm-card">
       <div class="card-body">
-        <div class="text-muted">Incidents (Open)</div>
-        <div class="fs-3 fw-bold">{{ incidents_open }}</div>
-        <a class="stretched-link" href="/incidents/?open=1"></a>
+        <div class="fw-semibold">People</div>
+        <div class="fm-muted" style="font-size: var(--fm-muted-size);">Drivers and assignments</div>
+        <div class="mt-2 d-flex justify-content-between"><span class="fm-muted">Drivers</span><span class="fw-semibold">{{ drivers_total }}</span></div>
+        <div class="d-flex justify-content-between"><span class="fm-muted">Open incidents</span><span class="fw-semibold">{{ incidents_open }}</span></div>
+        <a class="stretched-link" href="/drivers/"></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card fm-card">
+      <div class="card-body">
+        <div class="fw-semibold">Maintenance Load</div>
+        <div class="fm-muted" style="font-size: var(--fm-muted-size);">Open and in-progress work</div>
+        <div class="mt-2 d-flex justify-content-between"><span class="fm-muted">Open work orders</span><span class="fw-semibold">{{ open_work_orders }}</span></div>
+        <div class="d-flex justify-content-between"><span class="fm-muted">Vehicles in workshop</span><span class="fw-semibold">{{ vehicles_under_maintenance }}</span></div>
+        <a class="stretched-link" href="/maintenance/work-orders"></a>
       </div>
     </div>
   </div>
 </div>
 
-<div class="row g-3">
-  <div class="col-lg-6">
-    <div class="card">
+<!-- Charts section -->
+<div class="row g-2 mb-3">
+  <div class="col-12 col-xl-6">
+    <div class="card fm-card fm-chart-card">
+      <div class="card-header fw-semibold">Trips trend</div>
+      <div class="card-body"><canvas id="chartTrips"></canvas></div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="card fm-card fm-chart-card">
+      <div class="card-header fw-semibold">Fuel consumption</div>
+      <div class="card-body"><canvas id="chartFuel"></canvas></div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4">
+    <div class="card fm-card fm-chart-card">
+      <div class="card-header fw-semibold">Vehicle categories</div>
+      <div class="card-body"><canvas id="chartCats"></canvas></div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-8">
+    <div class="card fm-card">
+      <div class="card-header fw-semibold">Operational overview</div>
+      <div class="card-body">
+        <div class="row g-2">
+          <div class="col-12 col-md-6">{{ chip('Trips today: ' ~ trips_today_total, 'info') }}</div>
+          <div class="col-12 col-md-6">{{ chip('Fuel pending: ' ~ fuel_pending, 'warning') }}</div>
+          <div class="col-12 col-md-6">{{ chip('Docs expiring: ' ~ docs_expiring, 'warning') }}</div>
+          <div class="col-12 col-md-6">{{ chip('Incidents open: ' ~ incidents_open, 'warning') }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Two-column operational tables -->
+<div class="row g-2">
+  <div class="col-12 col-xl-6">
+    <div class="card fm-card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <div class="fw-semibold">Trips Today (latest)</div>
         <a class="btn btn-sm btn-outline-secondary" href="/trips/?date={{ today.isoformat() }}">View all</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
+          <table class="table table-hover mb-0">
             <thead>
               <tr>
-                <th>ID</th><th>Status</th><th>Vehicle</th><th>Driver</th><th>Time Out</th><th>Route</th>
+                <th style="width:90px;" class="fm-num">ID</th>
+                <th style="width:140px;">Status</th>
+                <th style="width:120px;">Vehicle</th>
+                <th style="width:180px;">Driver</th>
+                <th style="width:110px;">Time</th>
+                <th>Route</th>
               </tr>
             </thead>
             <tbody>
               {% for t in recent_trips %}
                 <tr>
-                  <td>{{ t.id }}</td>
-                  <td><span class="badge text-bg-secondary">{{ t.status.value }}</span></td>
-                  <td>{{ t.vehicle.plate_no if t.vehicle else '' }}</td>
-                  <td>{{ t.driver.name if t.driver else '' }}</td>
-                  <td>{{ t.time_out.strftime('%H:%M') if t.time_out else '' }}</td>
-                  <td>{{ (t.origin or '') ~ ' → ' ~ (t.destination_city or '') ~ ' → ' ~ (t.destination or '') }}</td>
+                  <td class="fm-num fm-mono">{{ t.id }}</td>
+                  <td>{{ badge(t.status.value) }}</td>
+                  <td class="fw-semibold">{{ t.vehicle.plate_no if t.vehicle else '—' }}</td>
+                  <td>{{ t.driver.name if t.driver else '—' }}</td>
+                  <td>{{ t.time_out.strftime('%H:%M') if t.time_out else '—' }}</td>
+                  <td class="fm-clamp-2">{{ (t.origin or '') ~ ' → ' ~ (t.destination_city or '') ~ ' → ' ~ (t.destination or '') }}</td>
                 </tr>
               {% endfor %}
               {% if not recent_trips %}
-                <tr><td colspan="6" class="text-muted p-3">No trips for today.</td></tr>
+                <tr><td colspan="6" class="fm-muted p-3">No trips for today.</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -129,33 +185,38 @@
     </div>
   </div>
 
-  <div class="col-lg-6">
-    <div class="card">
+  <div class="col-12 col-xl-6">
+    <div class="card fm-card">
       <div class="card-header d-flex justify-content-between align-items-center">
         <div class="fw-semibold">Upcoming Scheduled Trips (next 7 days)</div>
         <a class="btn btn-sm btn-outline-secondary" href="/trips/">View all</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
+          <table class="table table-hover mb-0">
             <thead>
               <tr>
-                <th>ID</th><th>Date/Time</th><th>Vehicle</th><th>Driver</th><th>Employee</th><th>Route</th>
+                <th style="width:90px;" class="fm-num">ID</th>
+                <th style="width:120px;">Date</th>
+                <th style="width:120px;">Vehicle</th>
+                <th style="width:180px;">Driver</th>
+                <th style="width:170px;">Employee</th>
+                <th>Route</th>
               </tr>
             </thead>
             <tbody>
               {% for t in upcoming_trips %}
                 <tr>
-                  <td>{{ t.id }}</td>
-                  <td>{{ t.time_out.strftime('%Y-%m-%d %H:%M') if t.time_out else '' }}</td>
-                  <td>{{ t.vehicle.plate_no if t.vehicle else '' }}</td>
-                  <td>{{ t.driver.name if t.driver else '' }}</td>
-                  <td>{{ t.employee_name or '' }}</td>
-                  <td>{{ (t.origin or '') ~ ' → ' ~ (t.destination_city or '') ~ ' → ' ~ (t.destination or '') }}</td>
+                  <td class="fm-num fm-mono">{{ t.id }}</td>
+                  <td>{{ t.time_out.strftime('%Y-%m-%d') if t.time_out else '—' }}</td>
+                  <td class="fw-semibold">{{ t.vehicle.plate_no if t.vehicle else '—' }}</td>
+                  <td>{{ t.driver.name if t.driver else '—' }}</td>
+                  <td>{{ t.employee_name or '—' }}</td>
+                  <td class="fm-clamp-2">{{ (t.origin or '') ~ ' → ' ~ (t.destination_city or '') ~ ' → ' ~ (t.destination or '') }}</td>
                 </tr>
               {% endfor %}
               {% if not upcoming_trips %}
-                <tr><td colspan="6" class="text-muted p-3">No scheduled trips in next 7 days.</td></tr>
+                <tr><td colspan="6" class="fm-muted p-3">No scheduled trips in next 7 days.</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -164,33 +225,36 @@
     </div>
   </div>
 
-  <div class="col-lg-6">
-    <div class="card">
+  <div class="col-12 col-xl-6">
+    <div class="card fm-card">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <div class="fw-semibold">Upcoming Vehicle Bookings (next 7 days)</div>
+        <div class="fw-semibold">Upcoming Bookings (next 7 days)</div>
         <a class="btn btn-sm btn-outline-secondary" href="/bookings/">View all</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
+          <table class="table table-hover mb-0">
             <thead>
               <tr>
-                <th>ID</th><th>Date/Time</th><th>Vehicle</th><th>Employee</th><th>Department</th><th>Purpose</th>
+                <th style="width:90px;" class="fm-num">ID</th>
+                <th style="width:120px;">Date</th>
+                <th style="width:120px;">Vehicle</th>
+                <th>Requestor</th>
+                <th style="width:180px;">Department</th>
               </tr>
             </thead>
             <tbody>
               {% for b in upcoming_bookings %}
                 <tr>
-                  <td>{{ b.id }}</td>
-                  <td>{{ b.start_at.strftime('%Y-%m-%d %H:%M') if b.start_at else '' }}</td>
-                  <td>{{ b.vehicle.plate_no if b.vehicle else '' }}</td>
+                  <td class="fm-num fm-mono">{{ b.id }}</td>
+                  <td>{{ b.start_at.strftime('%Y-%m-%d') if b.start_at else '—' }}</td>
+                  <td class="fw-semibold">{{ b.vehicle.plate_no if b.vehicle else '—' }}</td>
                   <td>{{ b.employee_name }}</td>
-                  <td>{{ b.department or '' }}</td>
-                  <td>{{ b.purpose or '' }}</td>
+                  <td>{{ b.department or '—' }}</td>
                 </tr>
               {% endfor %}
               {% if not upcoming_bookings %}
-                <tr><td colspan="6" class="text-muted p-3">No vehicle bookings in next 7 days.</td></tr>
+                <tr><td colspan="5" class="fm-muted p-3">No bookings in next 7 days.</td></tr>
               {% endif %}
             </tbody>
           </table>
@@ -199,107 +263,28 @@
     </div>
   </div>
 
-  <div class="col-lg-6">
-    <div class="card">
+  <div class="col-12 col-xl-6">
+    <div class="card fm-card">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <div class="fw-semibold">Work Orders (Open)</div>
-        <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders?status=open">View all</a>
+        <div class="fw-semibold">Queues</div>
+        <a class="btn btn-sm btn-outline-secondary" href="/reports/">View exports</a>
       </div>
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
+          <table class="table table-hover mb-0">
             <thead>
               <tr>
-                <th>ID</th><th>Status</th><th>Vehicle</th><th>Type</th><th>Title</th>
+                <th>Queue</th>
+                <th style="width:120px;" class="fm-num">Count</th>
+                <th style="width:160px;">Link</th>
               </tr>
             </thead>
             <tbody>
-              {% for wo in recent_work_orders %}
-                <tr>
-                  <td>{{ wo.id }}</td>
-                  <td><span class="badge text-bg-warning">{{ wo.status.value }}</span></td>
-                  <td>{{ wo.vehicle.plate_no if wo.vehicle else '' }}</td>
-                  <td>{{ wo.wo_type.value }}</td>
-                  <td>{{ wo.title }}</td>
-                </tr>
-              {% endfor %}
-              {% if not recent_work_orders %}
-                <tr><td colspan="5" class="text-muted p-3">No open work orders.</td></tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <div class="fw-semibold">Documents (Expiring / Expired)</div>
-        <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=expiring">View all</a>
-      </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
-            <thead>
-              <tr>
-                <th>ID</th><th>Vehicle</th><th>Type</th><th>Expiry</th><th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for d in recent_docs_expiring %}
-                <tr>
-                  <td>{{ d.id }}</td>
-                  <td>{{ d.vehicle.plate_no if d.vehicle else '' }}</td>
-                  <td>{{ d.doc_type.value }}</td>
-                  <td>
-                    {{ d.expiry_date.isoformat() }}
-                    {% if d.expiry_date < today %}
-                      <span class="badge text-bg-danger">expired</span>
-                    {% endif %}
-                  </td>
-                  <td>{{ d.status.value }}</td>
-                </tr>
-              {% endfor %}
-              {% if not recent_docs_expiring %}
-                <tr><td colspan="5" class="text-muted p-3">No expiring/expired docs in next 30 days.</td></tr>
-              {% endif %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <div class="fw-semibold">Fuel Pending Verification (latest)</div>
-        <a class="btn btn-sm btn-outline-secondary" href="/fuel/?status=pending">View all</a>
-      </div>
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-sm table-striped mb-0">
-            <thead>
-              <tr>
-                <th>ID</th><th>Slip</th><th>Date</th><th>Vehicle</th><th>Liters</th><th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for f in recent_fuel_pending %}
-                <tr>
-                  <td>{{ f.id }}</td>
-                  <td>{{ f.slip_no }}</td>
-                  <td>{{ f.fuel_date.isoformat() if f.fuel_date else '' }}</td>
-                  <td>{{ f.vehicle.plate_no if f.vehicle else '' }}</td>
-                  <td>{{ f.liters }}</td>
-                  <td>{{ f.amount or '' }}</td>
-                </tr>
-              {% endfor %}
-              {% if not recent_fuel_pending %}
-                <tr><td colspan="6" class="text-muted p-3">No pending fuel entries.</td></tr>
-              {% endif %}
+              <tr><td>Fuel pending verification</td><td class="fm-num fw-semibold">{{ fuel_pending }}</td><td><a href="/fuel/" class="btn btn-sm btn-outline-secondary">Open</a></td></tr>
+              <tr><td>Documents expiring (0–30)</td><td class="fm-num fw-semibold">{{ docs_expiring }}</td><td><a href="/documents/?mode=expiring" class="btn btn-sm btn-outline-secondary">Open</a></td></tr>
+              <tr><td>Documents expired</td><td class="fm-num fw-semibold">{{ docs_expired }}</td><td><a href="/documents/?mode=expired" class="btn btn-sm btn-outline-secondary">Open</a></td></tr>
+              <tr><td>Incidents open</td><td class="fm-num fw-semibold">{{ incidents_open }}</td><td><a href="/incidents/?open=1" class="btn btn-sm btn-outline-secondary">Open</a></td></tr>
+              <tr><td>Open work orders</td><td class="fm-num fw-semibold">{{ open_work_orders }}</td><td><a href="/maintenance/work-orders" class="btn btn-sm btn-outline-secondary">Open</a></td></tr>
             </tbody>
           </table>
         </div>
@@ -307,4 +292,42 @@
     </div>
   </div>
 </div>
+
+<!-- Chart.js (CDN) + placeholder datasets -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function(){
+    if(typeof Chart === 'undefined') return;
+
+    const tripsCtx = document.getElementById('chartTrips');
+    const fuelCtx = document.getElementById('chartFuel');
+    const catsCtx = document.getElementById('chartCats');
+
+    // Placeholder data (UI-only)
+    const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const trips = [12, 18, 15, 22, 20, 16, 19];
+    const fuel = [320, 280, 350, 300, 410, 260, 390];
+    const catLabels = ['General','PublicTransport','SchoolVan','Ambulance'];
+    const catVals = [14, 6, 4, 2];
+
+    new Chart(tripsCtx, {
+      type: 'line',
+      data: { labels, datasets: [{ label: 'Trips', data: trips, borderColor: '#2F63F6', backgroundColor: 'rgba(47,99,246,.12)', tension: .35, fill: true, pointRadius: 2 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(0,0,0,.06)' } }, x: { grid: { display: false } } } }
+    });
+
+    new Chart(fuelCtx, {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Liters', data: fuel, backgroundColor: 'rgba(3,105,161,.20)', borderColor: 'rgba(3,105,161,.55)', borderWidth: 1 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { grid: { color: 'rgba(0,0,0,.06)' } }, x: { grid: { display: false } } } }
+    });
+
+    new Chart(catsCtx, {
+      type: 'doughnut',
+      data: { labels: catLabels, datasets: [{ data: catVals, backgroundColor: ['rgba(47,99,246,.35)','rgba(3,105,161,.30)','rgba(21,128,61,.28)','rgba(180,83,9,.28)'], borderColor: 'rgba(255,255,255,.8)', borderWidth: 1 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10 } } }, cutout: '68%' }
+    });
+  })();
+</script>
+
 {% endblock %}

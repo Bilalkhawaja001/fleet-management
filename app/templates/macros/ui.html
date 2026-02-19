@@ -1,0 +1,118 @@
+{# Enterprise UI macros #}
+
+{% macro page_header(title, subtitle='', primary=None, secondary=None) %}
+  <div class="fm-pagehead mb-3">
+    <div>
+      <h1 class="fw-semibold" style="font-size: var(--fm-h1);">{{ title }}</h1>
+      {% if subtitle %}<div class="fm-subtitle">{{ subtitle }}</div>{% endif %}
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      {% if secondary %}{{ secondary|safe }}{% endif %}
+      {% if primary %}{{ primary|safe }}{% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro kpi_card(label, value, icon='bi-speedometer2', subtext='', href=None, tone='neutral') %}
+  {# tone: neutral|success|warning|danger|info #}
+  <div class="card fm-kpi fm-card">
+    <div class="card-body">
+      <div class="d-flex align-items-start justify-content-between">
+        <div>
+          <div class="fm-muted small">{{ label }}</div>
+          <div class="fm-kpi-value">{{ value }}</div>
+          {% if subtext %}<div class="fm-muted" style="font-size:.85rem;">{{ subtext }}</div>{% endif %}
+        </div>
+        <div class="fm-kpi-icon fm-kpi-{{ tone }}">
+          <i class="bi {{ icon }}"></i>
+        </div>
+      </div>
+      {% if href %}<a class="stretched-link" href="{{ href }}"></a>{% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro badge(status) %}
+  {% set s = (status|string)|lower %}
+  {% set cls = 'fm-badge-neutral' %}
+  {# success #}
+  {# Locked mapping across modules #}
+  {% if s in ['approved','verified'] %}
+    {% set cls = 'fm-badge-success' %}
+  {% elif s in ['completed'] %}
+    {% set cls = 'fm-badge-success' %}
+  {% elif s in ['closed','draft'] %}
+    {% set cls = 'fm-badge-neutral' %}
+  {% elif s in ['open','in_progress','planned','assigned','in-transit','in_transit','submitted','pending','scheduled','maintenance'] %}
+    {% set cls = 'fm-badge-info' %}
+  {% elif s in ['waiting_parts','warning','overdue','expiring','due'] %}
+    {% set cls = 'fm-badge-warning' %}
+  {% elif s in ['cancelled','canceled','rejected','deleted','failed','expired','inactive','retired'] %}
+    {% set cls = 'fm-badge-danger' %}
+  {% elif s in ['active','available','ok'] %}
+    {% set cls = 'fm-badge-success' %}
+  {% endif %}
+  <span class="fm-badge {{ cls }}">{{ status }}</span>
+{% endmacro %}
+
+{% macro toolbar(left='', right='') %}
+  <div class="fm-toolbar card fm-card mb-3">
+    <div class="card-body py-2">
+      <div class="d-flex flex-column flex-md-row gap-2 justify-content-between align-items-stretch align-items-md-center">
+        <div class="d-flex flex-column flex-md-row gap-2 align-items-stretch align-items-md-center">
+          {{ left|safe }}
+        </div>
+        <div class="d-flex gap-2 justify-content-end align-items-center">
+          {{ right|safe }}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{# Preferred name for data-heavy list pages #}
+{% macro table_toolbar(left='', right='') %}
+  {{ toolbar(left=left, right=right) }}
+{% endmacro %}
+
+{% macro empty_state(icon='bi-inbox', title='No records', subtitle='Nothing to display yet.', cta_label=None, cta_href=None) %}
+  <div class="fm-empty text-center p-5">
+    <div class="fm-empty-icon mb-2"><i class="bi {{ icon }}"></i></div>
+    <div class="fm-empty-title">{{ title }}</div>
+    <div class="fm-empty-subtitle">{{ subtitle }}</div>
+    {% if cta_label and cta_href %}
+      <div class="mt-3">
+        <a class="btn btn-primary btn-sm" href="{{ cta_href }}">{{ cta_label }}</a>
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro chip(text, tone='neutral') %}
+  {% set cls = 'fm-chip' %}
+  {% if tone == 'warning' %}{% set cls = 'fm-chip fm-chip-warning' %}{% endif %}
+  {% if tone == 'info' %}{% set cls = 'fm-chip fm-chip-info' %}{% endif %}
+  {% if tone == 'success' %}{% set cls = 'fm-chip fm-chip-success' %}{% endif %}
+  {% if tone == 'danger' %}{% set cls = 'fm-chip fm-chip-danger' %}{% endif %}
+  <span class="{{ cls }}">{{ text }}</span>
+{% endmacro %}
+
+{% macro confirm_modal(modal_id, title, body, confirm_label, form_id, confirm_btn_class='btn-danger') %}
+  <div class="modal fade" id="{{ modal_id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content fm-modal">
+        <div class="modal-header">
+          <h5 class="modal-title">{{ title }}</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="fm-muted">{{ body }}</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn {{ confirm_btn_class }}" form="{{ form_id }}">{{ confirm_label }}</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}

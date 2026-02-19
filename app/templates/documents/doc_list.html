@@ -1,66 +1,214 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, table_toolbar, badge, empty_state, chip %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-0">Vehicle Documents</h3>
-    <div class="text-muted" style="font-size: 0.9rem;">View: {{ mode }}</div>
-  </div>
-  <div class="d-flex gap-2">
-    <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=all">All</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=expiring">Expiring (0–30)</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=expired">Expired</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/documents/?mode=missing">Missing</a>
-    <a class="btn btn-sm btn-success" href="{{ url_for('documents.doc_create') }}">New</a>
+
+{{ page_header(
+  'Documents',
+  'Records cabinet for vehicle compliance and audit attachments',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('documents.doc_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Document</a>',
+  secondary=''
+    ~ '<button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Not implemented"><i class="bi bi-download me-1"></i>Export</button>'
+) }}
+
+{{ table_toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:360px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input id="docQ" class="form-control" placeholder="Search doc no / title / vehicle / tag" autocomplete="off">'
+    ~ '</div>'
+    ~ '<select id="docType" class="form-select form-select-sm" style="max-width:200px;">'
+    ~ '  <option value="">All Types</option>'
+    ~ '  <option value="invoice">Invoice</option>'
+    ~ '  <option value="receipt">Receipt</option>'
+    ~ '  <option value="permit">Permit</option>'
+    ~ '  <option value="insurance">Insurance</option>'
+    ~ '  <option value="other">Other</option>'
+    ~ '</select>'
+    ~ '<select id="docVehicle" class="form-select form-select-sm" style="max-width:170px;"><option value="">All Vehicles</option></select>'
+    ~ '<input id="docFrom" class="form-control form-control-sm" type="date" style="max-width:155px;" title="From">'
+    ~ '<input id="docTo" class="form-control form-control-sm" type="date" style="max-width:155px;" title="To">',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('documents.doc_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if mode == 'missing' %}
+      {% if missing_rows and missing_rows|length %}
+        <div class="table-responsive">
+          <table id="docMissing" class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th data-sort="veh" style="width:140px;">Vehicle</th>
+                <th>Missing Doc Types</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in missing_rows %}
+                <tr data-veh="{{ r.vehicle.plate_no }}" data-miss="{{ (r.missing|join(' '))|lower }}">
+                  <td class="fw-semibold">{{ r.vehicle.plate_no }}</td>
+                  <td>{{ chip('Missing','neutral') }} <span class="fm-muted">{{ r.missing | join(', ') }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        {{ empty_state('bi-folder2-open', 'No missing documents', 'All mandatory document types are present for active vehicles.', None, None) }}
+      {% endif %}
+
+    {% else %}
+
+      {% if docs and docs|length %}
+        <div class="table-responsive">
+          <table id="docTable" class="table table-hover mb-0">
+            <thead>
+              <tr>
+                <th data-sort="no" style="width:160px;">Doc No</th>
+                <th>Title / Description</th>
+                <th data-sort="type" style="width:160px;">Type</th>
+                <th style="width:170px;">Linked To</th>
+                <th data-sort="date" style="width:120px;">Date</th>
+                <th data-sort="owner" style="width:170px;">Owner</th>
+                <th data-sort="status" style="width:140px;">Status</th>
+                <th class="fm-actions"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for d in docs %}
+                {% set plate = d.vehicle.plate_no if d.vehicle else '' %}
+                {% set docno = d.doc_number or ('DOC-' ~ '%05d'|format(d.id)) %}
+                {% set title = d.doc_name or '—' %}
+                {% set day = (d.issue_date.isoformat() if d.issue_date else '') %}
+                {% set dtype = d.doc_type.value if d.doc_type else '' %}
+                {% set dtype_ui = dtype if dtype in ['insurance','permit'] else 'other' %}
+                {% set expired = (today and d.expiry_date and d.expiry_date < today) %}
+                {% set missing_file = (not d.attachment_path) %}
+
+                <tr class="{% if expired %}fm-row-warning{% endif %}"
+                    data-no="{{ docno|lower }}"
+                    data-title="{{ title|lower }}"
+                    data-veh="{{ plate }}"
+                    data-type="{{ dtype_ui }}"
+                    data-date="{{ day }}"
+                    data-status="{{ d.status.value if d.status else '' }}"
+                >
+                  <td class="fm-mono fw-semibold">{{ docno }}</td>
+                  <td>
+                    <div class="fw-semibold fm-clamp-2">{{ title }}</div>
+                    <div class="fm-muted fm-clamp-2" style="font-size: var(--fm-muted-size);">Expiry: {{ d.expiry_date.isoformat() if d.expiry_date else '—' }}</div>
+                    <div class="mt-1">
+                      {% if expired %}{{ chip('Expired','warning') }}{% endif %}
+                      {% if missing_file %}{{ chip('Missing','neutral') }}{% endif %}
+                    </div>
+                  </td>
+                  <td>{{ chip(dtype|replace('_',' ')|title, 'info') }}</td>
+                  <td>
+                    <div class="fw-semibold">Vehicle</div>
+                    <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ plate or '—' }}</div>
+                  </td>
+                  <td>{{ day or '—' }}</td>
+                  <td class="fm-muted">—</td>
+                  <td>{{ badge(d.status.value if d.status else '—') }}</td>
+                  <td class="fm-actions">
+                    <div class="btn-group btn-group-sm" role="group" aria-label="Document actions">
+                      <button class="btn btn-outline-secondary btn-icon" type="button" disabled title="View/Download (Not implemented)"><i class="bi bi-download"></i></button>
+                      <button class="btn btn-outline-secondary btn-icon" type="button" disabled title="Edit (Not implemented)"><i class="bi bi-pencil"></i></button>
+                      {% if current_user.role.value in ['super_admin','admin'] %}
+                        <button class="btn btn-outline-danger btn-icon" type="button" disabled title="Delete (Not implemented)"><i class="bi bi-trash"></i></button>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <script>
+          (function(){
+            const table = document.getElementById('docTable');
+            if(!table) return;
+            const tbody = table.querySelector('tbody');
+            const q = document.getElementById('docQ');
+            const tp = document.getElementById('docType');
+            const veh = document.getElementById('docVehicle');
+            const from = document.getElementById('docFrom');
+            const to = document.getElementById('docTo');
+
+            const vehicles = new Set();
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+              const v = (tr.dataset.veh || '').trim();
+              if(v) vehicles.add(v);
+            });
+            Array.from(vehicles).sort().forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o); });
+
+            function inRange(d){
+              if(!d) return true;
+              if(from?.value && d < from.value) return false;
+              if(to?.value && d > to.value) return false;
+              return true;
+            }
+
+            function apply(){
+              const term = (q?.value || '').trim().toLowerCase();
+              const type = (tp?.value || '').trim();
+              const v = (veh?.value || '').trim();
+
+              Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+                const no = tr.dataset.no || '';
+                const title = tr.dataset.title || '';
+                const vehicle = tr.dataset.veh || '';
+                const t = tr.dataset.type || '';
+                const date = tr.dataset.date || '';
+
+                const matchTerm = !term || no.includes(term) || title.includes(term) || vehicle.toLowerCase().includes(term);
+                const matchType = !type || t === type;
+                const matchVeh = !v || vehicle === v;
+                const matchDate = inRange(date);
+
+                tr.style.display = (matchTerm && matchType && matchVeh && matchDate) ? '' : 'none';
+              });
+            }
+
+            q?.addEventListener('input', apply);
+            tp?.addEventListener('change', apply);
+            veh?.addEventListener('change', apply);
+            from?.addEventListener('change', apply);
+            to?.addEventListener('change', apply);
+
+            // sorting
+            let sortKey=null, sortDir=1;
+            function getVal(tr,key){
+              const d = tr.dataset;
+              if(key==='no') return d.no||'';
+              if(key==='type') return d.type||'';
+              if(key==='date') return d.date||'9999-12-31';
+              if(key==='owner') return '';
+              if(key==='status') return d.status||'';
+              return '';
+            }
+            table.querySelectorAll('thead th[data-sort]').forEach(th => {
+              th.style.cursor='pointer';
+              th.addEventListener('click', () => {
+                const key = th.getAttribute('data-sort');
+                if(sortKey===key) sortDir=-sortDir; else { sortKey=key; sortDir=1; }
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                rows.sort((a,b)=> getVal(a,key).localeCompare(getVal(b,key))*sortDir);
+                rows.forEach(r=>tbody.appendChild(r));
+              });
+            });
+          })();
+        </script>
+
+      {% else %}
+        {{ empty_state('bi-folder2-open', 'No documents yet', 'Add the first document to start building an audit trail.', 'New Document', url_for('documents.doc_create')) }}
+      {% endif %}
+
+    {% endif %}
+
   </div>
 </div>
 
-{% if mode == 'missing' %}
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>Vehicle</th><th>Missing Doc Types</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for r in missing_rows %}
-        <tr>
-          <td>{{ r.vehicle.plate_no }}</td>
-          <td>{{ r.missing | join(', ') }}</td>
-        </tr>
-      {% endfor %}
-      {% if not missing_rows %}
-        <tr><td colspan="2" class="text-muted p-3">No missing documents.</td></tr>
-      {% endif %}
-    </tbody>
-  </table>
-{% else %}
-  <table class="table table-striped">
-    <thead>
-      <tr>
-        <th>ID</th><th>Vehicle</th><th>Type</th><th>Number</th><th>Issue</th><th>Expiry</th><th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for d in docs %}
-        <tr>
-          <td>{{ d.id }}</td>
-          <td>{{ d.vehicle.plate_no }}</td>
-          <td>{{ d.doc_type.value }}</td>
-          <td>{{ d.doc_number or '' }}</td>
-          <td>{{ d.issue_date or '' }}</td>
-          <td>
-            {{ d.expiry_date }}
-            {% if today and d.expiry_date < today %}
-              <span class="badge text-bg-danger">expired</span>
-            {% endif %}
-          </td>
-          <td>{{ d.status.value }}</td>
-        </tr>
-      {% endfor %}
-      {% if not docs %}
-        <tr><td colspan="7" class="text-muted p-3">No documents found.</td></tr>
-      {% endif %}
-    </tbody>
-  </table>
-{% endif %}
 {% endblock %}

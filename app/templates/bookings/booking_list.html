@@ -1,31 +1,161 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, table_toolbar, badge, empty_state %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Vehicle Bookings</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('bookings.booking_create') }}">New</a>
-</div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Vehicle</th><th>Employee</th><th>Department</th><th>Start</th><th>End</th><th>Status</th><th>Purpose</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for r in rows %}
-      <tr>
-        <td>{{ r.id }}</td>
-        <td>{{ r.vehicle.plate_no if r.vehicle else '' }}</td>
-        <td>{{ r.employee_name }}</td>
-        <td>{{ r.department or '' }}</td>
-        <td>{{ r.start_at.strftime('%Y-%m-%d %H:%M') if r.start_at else '' }}</td>
-        <td>{{ r.end_at.strftime('%Y-%m-%d %H:%M') if r.end_at else '' }}</td>
-        <td>{{ r.status.value }}</td>
-        <td>{{ r.purpose or '' }}</td>
-      </tr>
-    {% endfor %}
-    {% if not rows %}
-      <tr><td colspan="8" class="text-muted p-3">No bookings yet.</td></tr>
+
+{{ page_header(
+  'Bookings',
+  'Upcoming requests, allocations, and booking status',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('bookings.booking_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Booking</a>'
+) }}
+
+{{ table_toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:360px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input id="bkQ" class="form-control" placeholder="Search booking id / requestor / department / vehicle" autocomplete="off">'
+    ~ '</div>'
+    ~ '<input id="bkFrom" class="form-control form-control-sm" type="date" style="max-width:155px;" title="From">'
+    ~ '<input id="bkTo" class="form-control form-control-sm" type="date" style="max-width:155px;" title="To">'
+    ~ '<select id="bkStatus" class="form-select form-select-sm" style="max-width:170px;">'
+    ~ '  <option value="">All Status</option>'
+    ~ '  <option value="scheduled">Scheduled</option>'
+    ~ '  <option value="cancelled">Cancelled</option>'
+    ~ '  <option value="completed">Completed</option>'
+    ~ '</select>'
+    ~ '<select id="bkVehicle" class="form-select form-select-sm" style="max-width:190px;"><option value="">All Vehicles</option></select>',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('bookings.booking_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if rows and rows|length %}
+      <div class="table-responsive">
+        <table id="bkTable" class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th data-sort="id" style="width:120px;">Booking No</th>
+              <th data-sort="status" style="width:140px;">Status</th>
+              <th data-sort="date" style="width:120px;">Date</th>
+              <th data-sort="vehicle" style="width:120px;">Vehicle</th>
+              <th style="width:200px;">Driver</th>
+              <th data-sort="req" style="width:220px;">Requestor</th>
+              <th>Destination</th>
+              <th class="fm-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in rows %}
+              {% set day = (r.start_at.date().isoformat() if r.start_at else '') %}
+              {% set plate = (r.vehicle.plate_no if r.vehicle else '') %}
+              <tr
+                data-id="{{ r.id }}"
+                data-status="{{ r.status.value }}"
+                data-date="{{ day }}"
+                data-vehicle="{{ plate }}"
+                data-req="{{ (r.employee_name ~ ' ' ~ (r.department or ''))|lower }}"
+              >
+                <td class="fm-mono fw-semibold">BKG-{{ '%05d'|format(r.id) }}</td>
+                <td>{{ badge(r.status.value) }}</td>
+                <td>{{ day or '—' }}</td>
+                <td class="fw-semibold">{{ plate or '—' }}</td>
+                <td class="fm-muted">—</td>
+                <td>
+                  <div class="fw-semibold">{{ r.employee_name }}</div>
+                  <div class="fm-muted" style="font-size: var(--fm-muted-size);">{{ r.department or '—' }}</div>
+                </td>
+                <td class="fm-muted">—</td>
+                <td class="fm-actions">
+                  <a class="btn btn-outline-secondary btn-sm btn-icon" title="View" href="{{ url_for('bookings.booking_list') }}"><i class="bi bi-eye"></i></a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+        (function(){
+          const table = document.getElementById('bkTable');
+          if(!table) return;
+          const tbody = table.querySelector('tbody');
+          const q = document.getElementById('bkQ');
+          const from = document.getElementById('bkFrom');
+          const to = document.getElementById('bkTo');
+          const st = document.getElementById('bkStatus');
+          const veh = document.getElementById('bkVehicle');
+
+          const vehicles = new Set();
+          Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const v = (tr.dataset.vehicle || '').trim();
+            if(v) vehicles.add(v);
+          });
+          Array.from(vehicles).sort().forEach(v => {
+            const o = document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o);
+          });
+
+          function inRange(d){
+            if(!d) return true;
+            if(from?.value && d < from.value) return false;
+            if(to?.value && d > to.value) return false;
+            return true;
+          }
+
+          function apply(){
+            const term = (q?.value || '').trim().toLowerCase();
+            const status = (st?.value || '').trim();
+            const v = (veh?.value || '').trim();
+
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+              const id = tr.dataset.id || '';
+              const date = tr.dataset.date || '';
+              const s = tr.dataset.status || '';
+              const vehicle = tr.dataset.vehicle || '';
+              const req = tr.dataset.req || '';
+
+              const matchTerm = !term || id.includes(term) || vehicle.toLowerCase().includes(term) || req.includes(term);
+              const matchStatus = !status || s === status;
+              const matchVeh = !v || vehicle === v;
+              const matchDate = inRange(date);
+
+              tr.style.display = (matchTerm && matchStatus && matchVeh && matchDate) ? '' : 'none';
+            });
+          }
+
+          q?.addEventListener('input', apply);
+          from?.addEventListener('change', apply);
+          to?.addEventListener('change', apply);
+          st?.addEventListener('change', apply);
+          veh?.addEventListener('change', apply);
+
+          // sorting
+          let sortKey=null, sortDir=1;
+          function getVal(tr,key){
+            if(key==='id') return tr.dataset.id.padStart(10,'0');
+            if(key==='status') return tr.dataset.status;
+            if(key==='date') return tr.dataset.date || '9999-12-31';
+            if(key==='vehicle') return tr.dataset.vehicle;
+            if(key==='req') return tr.dataset.req;
+            return '';
+          }
+          table.querySelectorAll('thead th[data-sort]').forEach(th => {
+            th.style.cursor='pointer';
+            th.addEventListener('click', () => {
+              const key = th.getAttribute('data-sort');
+              if(sortKey===key) sortDir=-sortDir; else { sortKey=key; sortDir=1; }
+              const rows = Array.from(tbody.querySelectorAll('tr'));
+              rows.sort((a,b)=> getVal(a,key).localeCompare(getVal(b,key))*sortDir);
+              rows.forEach(r=>tbody.appendChild(r));
+            });
+          });
+        })();
+      </script>
+
+    {% else %}
+      {{ empty_state('bi-calendar-check', 'No bookings yet', 'Create a booking request to schedule vehicles.', 'New Booking', url_for('bookings.booking_create')) }}
     {% endif %}
-  </tbody>
-</table>
+
+  </div>
+</div>
 {% endblock %}

@@ -1,47 +1,162 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, badge, chip %}
 {% block content %}
-<h3 class="mb-3">{{ title }}</h3>
-<form method="post">
-  {{ form.hidden_tag() }}
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      {{ form.incident_no.label(class_='form-label') }}
-      {{ form.incident_no(class_='form-control') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.incident_dt.label(class_='form-label') }}
-      {{ form.incident_dt(class_='form-control') }}
-      <div class="form-text">Format: YYYY-MM-DD HH:MM</div>
+
+{{ page_header(title, 'Structured incident narrative for review and follow-up') }}
+
+<div class="row g-3">
+  <div class="col-12 col-xl-8">
+    <form method="post" class="card fm-card" id="incForm">
+      <div class="card-body">
+        {{ form.hidden_tag() }}
+
+        <div class="accordion" id="incAcc">
+
+          <!-- Summary -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hSum">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cSum" aria-expanded="true" aria-controls="cSum">Summary</button>
+            </h2>
+            <div id="cSum" class="accordion-collapse collapse show" aria-labelledby="hSum" data-bs-parent="#incAcc">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Incident No <span class="text-danger">*</span></label>
+                    {{ form.incident_no(class_='form-control fm-mono', id='incNo', required=True) }}
+                  </div>
+                  <div class="col-md-4">
+                    {{ form.vehicle_id.label(class_='form-label') }}
+                    {{ form.vehicle_id(class_='form-select', required=True) }}
+                  </div>
+                  <div class="col-md-4">
+                    {{ form.driver_id.label(class_='form-label') }}
+                    {{ form.driver_id(class_='form-select') }}
+                  </div>
+
+                  <div class="col-md-4">
+                    {{ form.severity.label(class_='form-label') }}
+                    {{ form.severity(class_='form-select') }}
+                  </div>
+                  <div class="col-md-4">
+                    {{ form.incident_type.label(class_='form-label') }}
+                    {{ form.incident_type(class_='form-select') }}
+                  </div>
+                  <div class="col-md-4">
+                    {{ form.incident_dt.label(class_='form-label') }}
+                    {{ form.incident_dt(class_='form-control') }}
+                    <div class="form-text">Format: YYYY-MM-DD HH:MM</div>
+                  </div>
+
+                  <div class="col-12">
+                    {{ form.location.label(class_='form-label') }}
+                    {{ form.location(class_='form-control') }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Details -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hDet">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cDet" aria-expanded="true" aria-controls="cDet">Details</button>
+            </h2>
+            <div id="cDet" class="accordion-collapse collapse show" aria-labelledby="hDet" data-bs-parent="#incAcc">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-12">
+                    {{ form.description.label(class_='form-label') }}
+                    {{ form.description(class_='form-control', rows=4, placeholder='What happened? Include observed damage, witnesses, and any immediate action taken.') }}
+                  </div>
+                  <div class="col-12">
+                    <div class="form-label">Attachments</div>
+                    <div class="fm-muted">Not implemented.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resolution -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hRes">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cRes" aria-expanded="false" aria-controls="cRes">Resolution</button>
+            </h2>
+            <div id="cRes" class="accordion-collapse collapse" aria-labelledby="hRes" data-bs-parent="#incAcc">
+              <div class="accordion-body">
+                <div class="fm-muted">Resolution fields are not available in backend yet.</div>
+                <div class="row g-3 mt-1">
+                  <div class="col-md-4"><label class="form-label">Root cause</label><input class="form-control" value="—" disabled></div>
+                  <div class="col-md-4"><label class="form-label">Corrective action</label><input class="form-control" value="—" disabled></div>
+                  <div class="col-md-4"><label class="form-label">Closed date</label><input class="form-control" value="—" disabled></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="d-flex gap-2 pt-3 justify-content-end">
+          {{ form.submit(class_='btn btn-primary') }}
+          <a class="btn btn-outline-secondary" href="{{ url_for('incidents.incident_list') }}">Back</a>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <div class="col-12 col-xl-4">
+    <div class="card fm-card fm-rail">
+      <div class="card-header fw-semibold">Summary</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Status</div>
+          <div>{{ badge('reported') }}</div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Severity</div>
+          <div class="fw-semibold" id="railSev">—</div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Vehicle</div>
+          <div class="fw-semibold" id="railVeh">—</div>
+        </div>
+
+        <div class="d-grid gap-2 mt-3">
+          <button class="btn btn-primary" type="submit" form="incForm">Save</button>
+          <button class="btn btn-outline-secondary" type="button" disabled>Close (Not implemented)</button>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      {{ form.vehicle_id.label(class_='form-label') }}
-      {{ form.vehicle_id(class_='form-select') }}
-    </div>
-    <div class="col-md-6 mb-3">
-      {{ form.driver_id.label(class_='form-label') }}
-      {{ form.driver_id(class_='form-select') }}
-    </div>
-  </div>
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      {{ form.incident_type.label(class_='form-label') }}
-      {{ form.incident_type(class_='form-select') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.severity.label(class_='form-label') }}
-      {{ form.severity(class_='form-select') }}
-    </div>
-    <div class="col-md-4 mb-3">
-      {{ form.location.label(class_='form-label') }}
-      {{ form.location(class_='form-control') }}
-    </div>
-  </div>
-  <div class="mb-3">
-    {{ form.description.label(class_='form-label') }}
-    {{ form.description(class_='form-control', rows=3) }}
-  </div>
-  {{ form.submit(class_='btn btn-primary') }}
-</form>
+</div>
+
+<script>
+  (function(){
+    const incNo = document.getElementById('incNo');
+    incNo?.addEventListener('input', () => { incNo.value = (incNo.value||'').toUpperCase(); });
+
+    function optText(sel){
+      if(!sel) return '—';
+      const o = sel.options[sel.selectedIndex];
+      const txt = (o && o.textContent) ? o.textContent.trim() : '';
+      return txt && txt !== '--' ? txt.split(' - ')[0] : '—';
+    }
+
+    const veh = document.querySelector('select[name="vehicle_id"]');
+    const sev = document.querySelector('select[name="severity"]');
+    const railVeh = document.getElementById('railVeh');
+    const railSev = document.getElementById('railSev');
+
+    function sync(){
+      if(railVeh) railVeh.textContent = optText(veh);
+      if(railSev) railSev.textContent = (sev?.value || '—').replace('_',' ');
+    }
+
+    veh?.addEventListener('change', sync);
+    sev?.addEventListener('change', sync);
+    sync();
+  })();
+</script>
+
 {% endblock %}

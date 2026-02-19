@@ -1,28 +1,208 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, table_toolbar, badge, empty_state, chip %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Incidents</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('incidents.incident_create') }}">New</a>
+
+{{ page_header(
+  'Incidents',
+  'SEV log for incident reporting, approvals, and follow-up',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('incidents.incident_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Incident</a>',
+  secondary=''
+    ~ '<button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Not implemented"><i class="bi bi-download me-1"></i>Export</button>'
+) }}
+
+{{ table_toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:360px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input id="incQ" class="form-control" placeholder="Search incident id / vehicle / driver / summary" autocomplete="off">'
+    ~ '</div>'
+    ~ '<select id="incSev" class="form-select form-select-sm" style="max-width:170px;">'
+    ~ '  <option value="">All Severity</option>'
+    ~ '  <option value="low">Low</option>'
+    ~ '  <option value="medium">Medium</option>'
+    ~ '  <option value="high">High</option>'
+    ~ '  <option value="critical">Critical</option>'
+    ~ '</select>'
+    ~ '<select id="incStatus" class="form-select form-select-sm" style="max-width:210px;">'
+    ~ '  <option value="">All Status</option>'
+    ~ '  <option value="open">Open</option>'
+    ~ '  <option value="investigating">Investigating</option>'
+    ~ '  <option value="resolved">Resolved</option>'
+    ~ '  <option value="closed">Closed</option>'
+    ~ '</select>'
+    ~ '<select id="incVehicle" class="form-select form-select-sm" style="max-width:170px;"><option value="">All Vehicles</option></select>'
+    ~ '<input id="incFrom" class="form-control form-control-sm" type="date" style="max-width:155px;" title="From">'
+    ~ '<input id="incTo" class="form-control form-control-sm" type="date" style="max-width:155px;" title="To">',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('incidents.incident_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if rows and rows|length %}
+      <div class="table-responsive">
+        <table id="incTable" class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th data-sort="no" style="width:160px;">Incident No</th>
+              <th data-sort="status" style="width:160px;">Status</th>
+              <th data-sort="sev" style="width:160px;">Severity</th>
+              <th data-sort="veh" style="width:120px;">Vehicle</th>
+              <th data-sort="drv" style="width:200px;">Driver</th>
+              <th>Summary</th>
+              <th data-sort="dt" style="width:120px;">Date</th>
+              <th data-sort="upd" style="width:120px;">Updated</th>
+              <th class="fm-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for i in rows %}
+              {% set plate = i.vehicle.plate_no if i.vehicle else '' %}
+              {% set drv = i.driver.name if i.driver else '' %}
+              {% set day = i.incident_dt.date().isoformat() if i.incident_dt else '' %}
+              {% set upd = i.created_at.date().isoformat() if i.created_at else '' %}
+              {% set sev = i.severity.value if i.severity else '' %}
+
+              {# map backend severity -> UI severity #}
+              {% set sev_ui = 'low' %}
+              {% if sev == 'major' %}{% set sev_ui = 'high' %}{% endif %}
+              {% if sev == 'total_loss' %}{% set sev_ui = 'critical' %}{% endif %}
+              {% set sev_tone = 'info' %}
+              {% if sev_ui == 'critical' %}{% set sev_tone = 'danger' %}{% elif sev_ui == 'high' %}{% set sev_tone = 'warning' %}{% elif sev_ui == 'medium' %}{% set sev_tone = 'info' %}{% else %}{% set sev_tone = 'neutral' %}{% endif %}
+
+              {# map backend status -> UI status #}
+              {% set st = i.status.value if i.status else '' %}
+              {% set st_ui = 'open' %}
+              {% if st == 'pending_approval' %}{% set st_ui = 'investigating' %}{% endif %}
+              {% if st == 'approved' %}{% set st_ui = 'resolved' %}{% endif %}
+              {% if st == 'closed' %}{% set st_ui = 'closed' %}{% endif %}
+              {% if st == 'rejected' %}{% set st_ui = 'closed' %}{% endif %}
+
+              <tr class="{% if sev_ui == 'critical' %}fm-row-danger{% endif %}"
+                  data-no="{{ i.incident_no|lower }}"
+                  data-status="{{ st_ui }}"
+                  data-sev="{{ sev_ui }}"
+                  data-veh="{{ plate }}"
+                  data-drv="{{ drv|lower }}"
+                  data-dt="{{ day }}"
+                  data-upd="{{ upd }}"
+              >
+                <td class="fm-mono fw-semibold">{{ i.incident_no }}</td>
+                <td>{{ badge(i.status.value) }}</td>
+                <td>{{ chip(sev_ui|title, sev_tone) }}</td>
+                <td class="fw-semibold">{{ plate }}</td>
+                <td>{{ drv or '—' }}</td>
+                <td>
+                  <div class="fw-semibold fm-clamp-2">{{ i.incident_type.value|replace('_',' ')|title }}</div>
+                  <div class="fm-muted fm-clamp-2" style="font-size: var(--fm-muted-size);">{{ i.description or '—' }}</div>
+                </td>
+                <td>{{ day or '—' }}</td>
+                <td>{{ upd or '—' }}</td>
+                <td class="fm-actions">
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Incident actions">
+                    <a class="btn btn-outline-secondary btn-icon" title="View/Edit" href="{{ url_for('incidents.incident_detail', incident_id=i.id) }}"><i class="bi bi-eye"></i></a>
+                    <button class="btn btn-outline-secondary btn-icon" type="button" disabled title="Close (Not implemented)"><i class="bi bi-check2-circle"></i></button>
+                    {% if current_user.role.value in ['super_admin','admin'] %}
+                      <button class="btn btn-outline-danger btn-icon" type="button" disabled title="Delete (Not implemented)"><i class="bi bi-trash"></i></button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+        (function(){
+          const table = document.getElementById('incTable');
+          if(!table) return;
+          const tbody = table.querySelector('tbody');
+
+          const q = document.getElementById('incQ');
+          const sev = document.getElementById('incSev');
+          const st = document.getElementById('incStatus');
+          const veh = document.getElementById('incVehicle');
+          const from = document.getElementById('incFrom');
+          const to = document.getElementById('incTo');
+
+          const vehicles = new Set();
+          Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const v = (tr.dataset.veh || '').trim();
+            if(v) vehicles.add(v);
+          });
+          Array.from(vehicles).sort().forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o); });
+
+          function inRange(d){
+            if(!d) return true;
+            if(from?.value && d < from.value) return false;
+            if(to?.value && d > to.value) return false;
+            return true;
+          }
+
+          function apply(){
+            const term = (q?.value || '').trim().toLowerCase();
+            const s1 = (sev?.value || '').trim();
+            const s2 = (st?.value || '').trim();
+            const v = (veh?.value || '').trim();
+
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+              const no = tr.dataset.no || '';
+              const status = tr.dataset.status || '';
+              const sevv = tr.dataset.sev || '';
+              const vehicle = tr.dataset.veh || '';
+              const driver = tr.dataset.drv || '';
+              const dt = tr.dataset.dt || '';
+              const summary = (tr.innerText||'').toLowerCase();
+
+              const matchTerm = !term || no.includes(term) || vehicle.toLowerCase().includes(term) || driver.includes(term) || summary.includes(term);
+              const matchSev = !s1 || sevv === s1;
+              const matchStatus = !s2 || status === s2;
+              const matchVeh = !v || vehicle === v;
+              const matchDate = inRange(dt);
+
+              tr.style.display = (matchTerm && matchSev && matchStatus && matchVeh && matchDate) ? '' : 'none';
+            });
+          }
+
+          q?.addEventListener('input', apply);
+          sev?.addEventListener('change', apply);
+          st?.addEventListener('change', apply);
+          veh?.addEventListener('change', apply);
+          from?.addEventListener('change', apply);
+          to?.addEventListener('change', apply);
+
+          // sorting
+          let sortKey=null, sortDir=1;
+          function getVal(tr,key){
+            const d = tr.dataset;
+            if(key==='no') return d.no||'';
+            if(key==='status') return d.status||'';
+            if(key==='sev') return d.sev||'';
+            if(key==='veh') return d.veh||'';
+            if(key==='drv') return d.drv||'';
+            if(key==='dt') return d.dt||'9999-12-31';
+            if(key==='upd') return d.upd||'9999-12-31';
+            return '';
+          }
+          table.querySelectorAll('thead th[data-sort]').forEach(th => {
+            th.style.cursor='pointer';
+            th.addEventListener('click', () => {
+              const key = th.getAttribute('data-sort');
+              if(sortKey===key) sortDir=-sortDir; else { sortKey=key; sortDir=1; }
+              const rows = Array.from(tbody.querySelectorAll('tr'));
+              rows.sort((a,b)=> getVal(a,key).localeCompare(getVal(b,key))*sortDir);
+              rows.forEach(r=>tbody.appendChild(r));
+            });
+          });
+        })();
+      </script>
+
+    {% else %}
+      {{ empty_state('bi-exclamation-triangle', 'No incidents yet', 'Log the first incident to begin review and follow-up.', 'New Incident', url_for('incidents.incident_create')) }}
+    {% endif %}
+
+  </div>
 </div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>No</th><th>Vehicle</th><th>Type</th><th>Severity</th><th>Status</th><th>When</th><th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for i in rows %}
-      <tr>
-        <td>{{ i.id }}</td>
-        <td>{{ i.incident_no }}</td>
-        <td>{{ i.vehicle.plate_no }}</td>
-        <td>{{ i.incident_type.value }}</td>
-        <td>{{ i.severity.value }}</td>
-        <td>{{ i.status.value }}</td>
-        <td>{{ i.incident_dt }}</td>
-        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('incidents.incident_detail', incident_id=i.id) }}">View</a></td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
 {% endblock %}

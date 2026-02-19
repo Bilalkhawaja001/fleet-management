@@ -10,6 +10,10 @@ class Vehicle(db.Model):
     plate_no = db.Column(db.String(32), unique=True, nullable=False, index=True)
     make_model = db.Column(db.String(120), nullable=False)
     year = db.Column(db.Integer, nullable=True)
+
+    # Professional category/type for reporting & filtering (e.g., Ambulance, Delivery Van)
+    category = db.Column(db.String(40), nullable=False, default="General")
+
     status = db.Column(db.String(32), nullable=False, default="active")
 
     current_driver_id = db.Column(db.Integer, db.ForeignKey("drivers.id"), nullable=True, index=True)

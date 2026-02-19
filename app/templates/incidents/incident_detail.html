@@ -1,6 +1,8 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, badge %}
 {% block content %}
-<h3 class="mb-3">Incident {{ inc.incident_no }}</h3>
+
+{{ page_header('Incident ' ~ inc.incident_no, 'Review details, severity, and approvals') }}
 <div class="row">
   <div class="col-md-6">
     <ul class="list-group mb-3">
@@ -8,13 +10,13 @@
       <li class="list-group-item"><b>Driver:</b> {{ inc.driver.name if inc.driver else '' }}</li>
       <li class="list-group-item"><b>Type:</b> {{ inc.incident_type.value }}</li>
       <li class="list-group-item"><b>Severity:</b> {{ inc.severity.value }}</li>
-      <li class="list-group-item"><b>Status:</b> {{ inc.status.value }}</li>
+      <li class="list-group-item d-flex justify-content-between align-items-center"><b>Status</b> {{ badge(inc.status.value) }}</li>
       <li class="list-group-item"><b>When:</b> {{ inc.incident_dt }}</li>
       <li class="list-group-item"><b>Location:</b> {{ inc.location or '' }}</li>
     </ul>
   </div>
   <div class="col-md-6">
-    <div class="card mb-3">
+    <div class="card fm-card mb-3">
       <div class="card-header">Description</div>
       <div class="card-body"><pre style="white-space:pre-wrap">{{ inc.description or '' }}</pre></div>
     </div>
@@ -22,7 +24,7 @@
 </div>
 
 {% if can_decide and inc.status.value in ['pending_approval','reported'] %}
-  <div class="card">
+  <div class="card fm-card">
     <div class="card-header">Decision</div>
     <div class="card-body">
       <form method="post">

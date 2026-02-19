@@ -1,25 +1,155 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, table_toolbar, empty_state, chip, badge %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Preventive Schedules</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('maintenance.schedule_create') }}">New</a>
+
+{{ page_header(
+  'Maintenance',
+  'Work orders and preventive schedules',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('maintenance.schedule_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Schedule</a>'
+) }}
+
+<!-- Tabs (UI-only shell) -->
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation"><a class="nav-link" href="{{ url_for('maintenance.wo_list') }}">Work Orders</a></li>
+  <li class="nav-item" role="presentation"><a class="nav-link active" href="{{ url_for('maintenance.schedule_list') }}">Preventive / Scheduled</a></li>
+</ul>
+
+<div class="row g-2 mb-3 fm-kpi-strip">
+  <div class="col-6 col-lg-3"><div class="card fm-card"><div class="card-body py-2"><div class="fm-muted small">Active</div><div class="fw-bold" id="kAct">—</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card fm-card"><div class="card-body py-2"><div class="fm-muted small">Inactive</div><div class="fw-bold" id="kInact">—</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card fm-card"><div class="card-body py-2"><div class="fm-muted small">Due</div><div class="fw-bold">—</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card fm-card"><div class="card-body py-2"><div class="fm-muted small">Closed (30d)</div><div class="fw-bold">—</div></div></div></div>
 </div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Vehicle</th><th>Title</th><th>Interval km</th><th>Interval days</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for s in schedules %}
-      <tr>
-        <td>{{ s.id }}</td>
-        <td>{{ s.vehicle.plate_no }}</td>
-        <td>{{ s.title }}</td>
-        <td>{{ s.interval_km or '' }}</td>
-        <td>{{ s.interval_days or '' }}</td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+
+{{ table_toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:360px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input id="scQ" class="form-control" placeholder="Search plan / vehicle / title" autocomplete="off">'
+    ~ '</div>'
+    ~ '<select id="scVehicle" class="form-select form-select-sm" style="max-width:170px;"><option value="">All Vehicles</option></select>'
+    ~ '<select id="scActive" class="form-select form-select-sm" style="max-width:160px;">'
+    ~ '  <option value="">All</option>'
+    ~ '  <option value="1">Active</option>'
+    ~ '  <option value="0">Inactive</option>'
+    ~ '</select>',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('maintenance.schedule_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if schedules and schedules|length %}
+      <div class="table-responsive">
+        <table id="scTable" class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th data-sort="id" style="width:140px;">Plan No</th>
+              <th data-sort="veh" style="width:120px;">Vehicle</th>
+              <th data-sort="int" style="width:180px;">Interval</th>
+              <th data-sort="next" style="width:160px;">Next Due</th>
+              <th data-sort="st" style="width:140px;">Status</th>
+              <th class="fm-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in schedules %}
+              {% set plate = s.vehicle.plate_no if s.vehicle else '' %}
+              {% set plan = 'PM-' ~ '%05d'|format(s.id) %}
+              {% set interval = ( (s.interval_km and (s.interval_km|string ~ ' km')) or '' ) ~ ( (s.interval_days and (' / ' ~ s.interval_days|string ~ ' days')) or '' ) %}
+              {% set active = 1 if s.active else 0 %}
+              <tr data-id="{{ s.id }}" data-veh="{{ plate }}" data-title="{{ (s.title or '')|lower }}" data-active="{{ active }}">
+                <td class="fm-mono fw-semibold">{{ plan }}</td>
+                <td class="fw-semibold">{{ plate }}</td>
+                <td>{{ interval or '—' }}</td>
+                <td class="fm-muted">—</td>
+                <td>{{ badge('active' if s.active else 'inactive') }}</td>
+                <td class="fm-actions">
+                  <button class="btn btn-outline-secondary btn-sm btn-icon" type="button" disabled title="Not implemented"><i class="bi bi-eye"></i></button>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+        (function(){
+          const table = document.getElementById('scTable');
+          if(!table) return;
+          const tbody = table.querySelector('tbody');
+          const q = document.getElementById('scQ');
+          const veh = document.getElementById('scVehicle');
+          const act = document.getElementById('scActive');
+
+          const vehicles = new Set();
+          Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const v = (tr.dataset.veh || '').trim();
+            if(v) vehicles.add(v);
+          });
+          Array.from(vehicles).sort().forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o); });
+
+          function apply(){
+            const term = (q?.value || '').trim().toLowerCase();
+            const v = (veh?.value || '').trim();
+            const a = (act?.value || '').trim();
+
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+              const plan = (tr.querySelector('td')?.innerText || '').toLowerCase();
+              const title = tr.dataset.title || '';
+              const vehicle = tr.dataset.veh || '';
+              const active = tr.dataset.active || '';
+
+              const matchTerm = !term || plan.includes(term) || title.includes(term) || vehicle.toLowerCase().includes(term);
+              const matchVeh = !v || vehicle === v;
+              const matchAct = !a || active === a;
+              tr.style.display = (matchTerm && matchVeh && matchAct) ? '' : 'none';
+            });
+            kpis();
+          }
+
+          function kpis(){
+            const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+            const active = rows.filter(r => r.dataset.active === '1').length;
+            const inactive = rows.filter(r => r.dataset.active === '0').length;
+            document.getElementById('kAct').textContent = active;
+            document.getElementById('kInact').textContent = inactive;
+          }
+
+          q?.addEventListener('input', apply);
+          veh?.addEventListener('change', apply);
+          act?.addEventListener('change', apply);
+
+          // sorting
+          let sortKey=null, sortDir=1;
+          function getVal(tr,key){
+            if(key==='id') return tr.dataset.id.padStart(10,'0');
+            if(key==='veh') return tr.dataset.veh||'';
+            if(key==='int') return tr.children[3]?.innerText || '';
+            if(key==='next') return '';
+            if(key==='st') return tr.dataset.active || '';
+            return '';
+          }
+          table.querySelectorAll('thead th[data-sort]').forEach(th => {
+            th.style.cursor='pointer';
+            th.addEventListener('click', () => {
+              const key = th.getAttribute('data-sort');
+              if(sortKey===key) sortDir=-sortDir; else { sortKey=key; sortDir=1; }
+              const rows = Array.from(tbody.querySelectorAll('tr'));
+              rows.sort((a,b)=> getVal(a,key).localeCompare(getVal(b,key))*sortDir);
+              rows.forEach(r=>tbody.appendChild(r));
+            });
+          });
+
+          kpis();
+        })();
+      </script>
+
+    {% else %}
+      {{ empty_state('bi-wrench-adjustable', 'No schedules yet', 'Create preventive plans to standardize recurring maintenance.', 'New Schedule', url_for('maintenance.schedule_create')) }}
+    {% endif %}
+
+  </div>
+</div>
 {% endblock %}

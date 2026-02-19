@@ -1,7 +1,12 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header %}
 {% block content %}
-<h3 class="mb-3">{{ title }}</h3>
-<form method="post">
+
+{{ page_header(title, 'Create or update a vehicle booking request') }}
+
+<div class="card fm-card">
+  <div class="card-body">
+    <form method="post">
   {{ form.hidden_tag() }}
 
   <div class="row">
@@ -37,7 +42,11 @@
     </div>
   </div>
 
-  {{ form.submit(class_='btn btn-primary') }}
-  <a class="btn btn-secondary" href="{{ url_for('bookings.booking_list') }}">Cancel</a>
-</form>
+      <div class="d-flex gap-2 pt-2">
+        {{ form.submit(class_='btn btn-primary') }}
+        <a class="btn btn-outline-secondary" href="{{ url_for('bookings.booking_list') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
 {% endblock %}

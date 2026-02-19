@@ -1,28 +1,192 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, badge, chip %}
 {% block content %}
-<h3 class="mb-3">{{ title }}</h3>
-<form method="post">
-  {{ form.hidden_tag() }}
-  <div class="row">
-    <div class="col-md-6 mb-3">
-      {{ form.vehicle_id.label(class_='form-label') }}
-      {{ form.vehicle_id(class_='form-select') }}
-    </div>
-    <div class="col-md-6 mb-3">
-      {{ form.title.label(class_='form-label') }}
-      {{ form.title(class_='form-control') }}
+
+{{ page_header(title, 'Create / update a work order (audit-ready)') }}
+
+<div class="row g-3">
+  <div class="col-12 col-xl-8">
+    <form method="post" class="card fm-card" id="woForm">
+      <div class="card-body">
+        {{ form.hidden_tag() }}
+
+        <div class="accordion" id="woAcc">
+
+          <!-- Summary -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hSum">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cSum" aria-expanded="true" aria-controls="cSum">Summary</button>
+            </h2>
+            <div id="cSum" class="accordion-collapse collapse show" aria-labelledby="hSum" data-bs-parent="#woAcc">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    {{ form.vehicle_id.label(class_='form-label') }}
+                    {{ form.vehicle_id(class_='form-select', required=True) }}
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Category</label>
+                    <input class="form-control" value="—" disabled>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Priority</label>
+                    <input class="form-control" value="—" disabled>
+                  </div>
+                  <div class="col-md-6">
+                    {{ form.status.label(class_='form-label') }}
+                    {{ form.status(class_='form-select') }}
+                  </div>
+
+                  <div class="col-12">
+                    {{ form.title.label(class_='form-label') }}
+                    {{ form.title(class_='form-control', required=True, placeholder='Short summary of issue / service') }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Details -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hDet">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cDet" aria-expanded="true" aria-controls="cDet">Details</button>
+            </h2>
+            <div id="cDet" class="accordion-collapse collapse show" aria-labelledby="hDet" data-bs-parent="#woAcc">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-12">
+                    {{ form.description.label(class_='form-label') }}
+                    {{ form.description(class_='form-control', rows=4, placeholder='Complaint / diagnosis / work performed (as available)') }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vendor & Cost -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hCost">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cCost" aria-expanded="false" aria-controls="cCost">Vendor & Cost</button>
+            </h2>
+            <div id="cCost" class="accordion-collapse collapse" aria-labelledby="hCost" data-bs-parent="#woAcc">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Vendor</label>
+                    <input class="form-control" placeholder="Vendor name" disabled>
+                    <div class="form-text">Not implemented in this form yet.</div>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Est. Cost</label>
+                    <input class="form-control" inputmode="decimal" placeholder="0.00" disabled>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Final Cost</label>
+                    <input class="form-control" inputmode="decimal" placeholder="0.00" disabled>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dates -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hDates">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cDates" aria-expanded="false" aria-controls="cDates">Dates</button>
+            </h2>
+            <div id="cDates" class="accordion-collapse collapse" aria-labelledby="hDates" data-bs-parent="#woAcc">
+              <div class="accordion-body">
+                <div class="row g-3">
+                  <div class="col-md-3"><label class="form-label">Opened</label><input class="form-control" type="datetime-local" disabled></div>
+                  <div class="col-md-3"><label class="form-label">Due</label><input class="form-control" type="date" disabled></div>
+                  <div class="col-md-3"><label class="form-label">Closed</label><input class="form-control" type="datetime-local" disabled></div>
+                </div>
+                <div class="form-text">Due date not present in backend yet.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Attachments -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hAtt">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cAtt" aria-expanded="false" aria-controls="cAtt">Attachments</button>
+            </h2>
+            <div id="cAtt" class="accordion-collapse collapse" aria-labelledby="hAtt" data-bs-parent="#woAcc">
+              <div class="accordion-body">
+                <div class="fm-muted">Not implemented.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Audit -->
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="hAudit">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cAudit" aria-expanded="false" aria-controls="cAudit">Audit</button>
+            </h2>
+            <div id="cAudit" class="accordion-collapse collapse" aria-labelledby="hAudit" data-bs-parent="#woAcc">
+              <div class="accordion-body">
+                <div class="fm-muted">Created by / timestamps not exposed here.</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="d-flex gap-2 pt-3 justify-content-end">
+          {{ form.submit(class_='btn btn-primary') }}
+          <a class="btn btn-outline-secondary" href="{{ url_for('maintenance.wo_list') }}">Back</a>
+        </div>
+
+      </div>
+    </form>
+  </div>
+
+  <div class="col-12 col-xl-4">
+    <div class="card fm-card fm-rail">
+      <div class="card-header fw-semibold">Summary</div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Status</div>
+          <div>{{ badge(form.status.data or 'open') }}</div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Priority</div>
+          <div>{{ chip('Medium','info') }}</div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Vehicle</div>
+          <div class="fw-semibold" id="railVeh">—</div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fm-muted">Est / Final</div>
+          <div class="fw-semibold">—</div>
+        </div>
+
+        <div class="d-grid gap-2 mt-3">
+          <button class="btn btn-primary" type="submit" form="woForm">Save</button>
+          <button class="btn btn-outline-secondary" type="button" disabled>Approve (Not implemented)</button>
+          <button class="btn btn-outline-secondary" type="button" disabled>Close (Not implemented)</button>
+        </div>
+        <div class="small fm-muted mt-3">Workflow actions will appear here when endpoints are added.</div>
+      </div>
     </div>
   </div>
-  <div class="row">
-    <div class="col-md-3 mb-3">
-      {{ form.status.label(class_='form-label') }}
-      {{ form.status(class_='form-select') }}
-    </div>
-  </div>
-  <div class="mb-3">
-    {{ form.description.label(class_='form-label') }}
-    {{ form.description(class_='form-control', rows=4) }}
-  </div>
-  {{ form.submit(class_='btn btn-primary') }}
-</form>
+</div>
+
+<script>
+  (function(){
+    const veh = document.querySelector('select[name="vehicle_id"]');
+    const rail = document.getElementById('railVeh');
+    function optText(sel){
+      if(!sel) return '—';
+      const o = sel.options[sel.selectedIndex];
+      const txt = (o && o.textContent) ? o.textContent.trim() : '';
+      return txt ? txt.split(' - ')[0] : '—';
+    }
+    function sync(){ if(rail) rail.textContent = optText(veh); }
+    veh?.addEventListener('change', sync);
+    sync();
+  })();
+</script>
+
 {% endblock %}

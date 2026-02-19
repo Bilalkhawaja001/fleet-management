@@ -1,30 +1,105 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header %}
 {% block content %}
-<h3 class="mb-3">{{ title }}</h3>
-<form method="post">
-  {{ form.hidden_tag() }}
-  <div class="row">
-    <div class="col-md-4 mb-3">
-      {{ form.name.label(class_='form-label') }}
-      {{ form.name(class_='form-control') }}
+
+{{ page_header(title, 'Driver profile, license, and status') }}
+
+<form method="post" class="card fm-card">
+  <div class="card-body">
+    {{ form.hidden_tag() }}
+
+    <div class="row g-3">
+      <div class="col-12 col-lg-6">
+        <div class="small text-uppercase fm-muted mb-2" style="letter-spacing:.08em;">Identity</div>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Name <span class="text-danger">*</span></label>
+            {{ form.name(class_='form-control', required=True, placeholder='Driver full name') }}
+            <div class="form-text">Use the legal name for audits and compliance.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="small text-uppercase fm-muted mb-2" style="letter-spacing:.08em;">Contact</div>
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">Phone</label>
+            {{ form.phone(class_='form-control', inputmode='numeric', pattern='[0-9+\- ]{7,20}', placeholder='+92XXXXXXXXXX') }}
+            <div class="form-text">Digits only (basic validation).</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">Status <span class="text-danger">*</span></label>
+            {{ form.status(class_='form-control', required=True, list='drvStatusList', placeholder='active') }}
+            <datalist id="drvStatusList">
+              <option value="active"></option>
+              <option value="inactive"></option>
+              <option value="suspended"></option>
+            </datalist>
+            <div class="form-text">Recommended: active / inactive.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12">
+        <hr class="my-2">
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="small text-uppercase fm-muted mb-2" style="letter-spacing:.08em;">License</div>
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label">License No</label>
+            {{ form.license_no(class_='form-control', placeholder='e.g., LHR-XXXX-XXXX') }}
+            <div class="form-text">Optional, but recommended for compliance.</div>
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label">License Expiry</label>
+            {{ form.license_expiry(class_='form-control', type='date', id='licenseExpiry') }}
+            <div class="form-text" id="expiryHelp">Set a valid expiry date to enable alerts.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 col-lg-6">
+        <div class="small text-uppercase fm-muted mb-2" style="letter-spacing:.08em;">Notes</div>
+        <div class="fm-muted" style="font-size: var(--fm-muted-size);">No additional fields yet. Future: CNIC, address, emergency contact.</div>
+      </div>
+
     </div>
-    <div class="col-md-3 mb-3">
-      {{ form.phone.label(class_='form-label') }}
-      {{ form.phone(class_='form-control') }}
+
+    <div class="d-flex gap-2 pt-3 justify-content-end">
+      {{ form.submit(class_='btn btn-primary') }}
+      <a class="btn btn-outline-secondary" href="{{ url_for('drivers.driver_list') }}">Cancel</a>
     </div>
-    <div class="col-md-3 mb-3">
-      {{ form.license_no.label(class_='form-label') }}
-      {{ form.license_no(class_='form-control') }}
-    </div>
-    <div class="col-md-3 mb-3">
-      {{ form.license_expiry.label(class_='form-label') }}
-      {{ form.license_expiry(class_='form-control', type='date') }}
-    </div>
-    <div class="col-md-2 mb-3">
-      {{ form.status.label(class_='form-label') }}
-      {{ form.status(class_='form-control') }}
-    </div>
+
   </div>
-  {{ form.submit(class_='btn btn-primary') }}
 </form>
+
+<script>
+  (function(){
+    const inp = document.getElementById('licenseExpiry');
+    const help = document.getElementById('expiryHelp');
+    if(!inp || !help) return;
+
+    function check(){
+      if(!inp.value) return;
+      const d = new Date(inp.value + 'T00:00:00');
+      if(isNaN(d.getTime())) return;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if(d < today){
+        help.textContent = 'Warning: expiry date is in the past.';
+        help.classList.add('text-warning');
+      } else {
+        help.textContent = 'Looks good.';
+        help.classList.remove('text-warning');
+      }
+    }
+
+    inp.addEventListener('change', check);
+    check();
+  })();
+</script>
+
 {% endblock %}

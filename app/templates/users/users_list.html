@@ -1,10 +1,27 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, toolbar, badge %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h3>Users</h3>
-  <a class="btn btn-sm btn-success" href="{{ url_for('users.user_create') }}">New</a>
-</div>
-<table class="table table-striped">
+
+{{ page_header(
+  'Users',
+  'User accounts, roles, and access control',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('users.user_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New User</a>'
+) }}
+
+{{ toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:420px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input class="form-control" placeholder="Search username (coming soon)" disabled>'
+    ~ '</div>',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('users.user_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-striped table-hover mb-0">
   <thead>
     <tr>
       <th>ID</th><th>Username</th><th>Role</th><th>Active</th><th></th>
@@ -15,11 +32,14 @@
       <tr>
         <td>{{ u.id }}</td>
         <td>{{ u.username }}</td>
-        <td>{{ u.role.value }}</td>
-        <td>{{ 'yes' if u.is_active else 'no' }}</td>
+        <td>{{ badge(u.role.value) }}</td>
+        <td>{{ badge('active' if u.is_active else 'inactive') }}</td>
         <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('users.user_edit', user_id=u.id) }}">Edit</a></td>
       </tr>
     {% endfor %}
   </tbody>
-</table>
+      </table>
+    </div>
+  </div>
+</div>
 {% endblock %}

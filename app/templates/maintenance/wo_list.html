@@ -1,35 +1,237 @@
 {% extends 'base.html' %}
+{% from 'macros/ui.html' import page_header, table_toolbar, badge, empty_state, chip %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h3 class="mb-0">Work Orders</h3>
-    {% if filter_status %}<div class="text-muted" style="font-size: 0.9rem;">Filter: status={{ filter_status }}</div>{% endif %}
-  </div>
-  <div class="d-flex gap-2">
-    <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders">All</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders?status=open">Open</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders?status=in_progress">In Progress</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders?status=completed">Completed</a>
-    <a class="btn btn-sm btn-outline-secondary" href="/maintenance/work-orders?status=closed">Closed</a>
-    <a class="btn btn-sm btn-success" href="{{ url_for('maintenance.wo_create') }}">New</a>
+
+{{ page_header(
+  'Maintenance',
+  'Work orders and preventive schedules',
+  primary='<a class="btn btn-sm btn-primary" href="' ~ url_for('maintenance.wo_create') ~ '"><i class="bi bi-plus-lg me-1"></i>New Work Order</a>',
+  secondary=''
+    ~ '<button class="btn btn-sm btn-outline-secondary" type="button" disabled title="Not implemented"><i class="bi bi-download me-1"></i>Export</button>'
+) }}
+
+<!-- Tabs (UI-only shell) -->
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item" role="presentation"><a class="nav-link active" href="{{ url_for('maintenance.wo_list') }}">Work Orders</a></li>
+  <li class="nav-item" role="presentation"><a class="nav-link" href="{{ url_for('maintenance.schedule_list') }}">Preventive / Scheduled</a></li>
+</ul>
+
+<!-- KPI strip (UI-only, derived from visible rows) -->
+<div class="row g-2 mb-3 fm-kpi-strip">
+  <div class="col-6 col-lg-3"><div class="card fm-card"><div class="card-body py-2"><div class="fm-muted small">Open</div><div class="fw-bold" id="kOpen">—</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card fm-card"><div class="card-body py-2"><div class="fm-muted small">In Progress</div><div class="fw-bold" id="kProg">—</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card fm-card"><div class="card-body py-2"><div class="fm-muted small">Overdue</div><div class="fw-bold" id="kOver">—</div></div></div></div>
+  <div class="col-6 col-lg-3"><div class="card fm-card"><div class="card-body py-2"><div class="fm-muted small">Closed (30d)</div><div class="fw-bold" id="kClosed">—</div></div></div></div>
+</div>
+
+{{ table_toolbar(
+  left=''
+    ~ '<div class="input-group input-group-sm" style="max-width:340px;">'
+    ~ '  <span class="input-group-text"><i class="bi bi-search"></i></span>'
+    ~ '  <input id="woQ" class="form-control" placeholder="Search WO no / vehicle / issue / vendor" autocomplete="off">'
+    ~ '</div>'
+    ~ '<select id="woStatus" class="form-select form-select-sm" style="max-width:190px;">'
+    ~ '  <option value="">All Status</option>'
+    ~ '  <option value="open">Open</option>'
+    ~ '  <option value="in_progress">In Progress</option>'
+    ~ '  <option value="waiting_parts">Waiting Parts</option>'
+    ~ '  <option value="completed">Completed</option>'
+    ~ '  <option value="closed">Closed</option>'
+    ~ '  <option value="cancelled">Cancelled</option>'
+    ~ '</select>'
+    ~ '<select id="woPriority" class="form-select form-select-sm" style="max-width:170px;">'
+    ~ '  <option value="">All Priority</option>'
+    ~ '  <option value="low">Low</option>'
+    ~ '  <option value="medium">Medium</option>'
+    ~ '  <option value="high">High</option>'
+    ~ '  <option value="critical">Critical</option>'
+    ~ '</select>'
+    ~ '<select id="woVehicle" class="form-select form-select-sm" style="max-width:170px;"><option value="">All Vehicles</option></select>'
+    ~ '<input id="woFrom" class="form-control form-control-sm" type="date" style="max-width:155px;" title="From">'
+    ~ '<input id="woTo" class="form-control form-control-sm" type="date" style="max-width:155px;" title="To">',
+  right=''
+    ~ '<a class="btn btn-sm btn-outline-secondary" href="' ~ url_for('maintenance.wo_list') ~ '"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</a>'
+) }}
+
+<div class="card fm-card">
+  <div class="card-body p-0">
+
+    {% if work_orders and work_orders|length %}
+      <div class="table-responsive">
+        <table id="woTable" class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th data-sort="no" style="width:140px;">WO No</th>
+              <th data-sort="status" style="width:140px;">Status</th>
+              <th data-sort="prio" style="width:140px;">Priority</th>
+              <th data-sort="veh" style="width:120px;">Vehicle</th>
+              <th data-sort="cat" style="width:160px;">Category</th>
+              <th>Issue / Summary</th>
+              <th data-sort="vendor" style="width:200px;">Vendor</th>
+              <th data-sort="cost" style="width:120px;" class="fm-money">Cost</th>
+              <th data-sort="due" style="width:120px;">Due Date</th>
+              <th data-sort="upd" style="width:120px;">Updated</th>
+              <th class="fm-actions"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for wo in work_orders %}
+              {% set plate = wo.vehicle.plate_no if wo.vehicle else '' %}
+              {% set vendor = wo.vendor_name or '' %}
+              {% set no = wo.wo_no or ('WO-' ~ '%05d'|format(wo.id)) %}
+              {% set updated = wo.created_at.date().isoformat() if wo.created_at else '' %}
+              {% set due = '' %}
+              {% set overdue = false %}
+              {% set priority = '' %}
+              {% set pr_tone = 'neutral' %}
+              {% set category = wo.wo_type.value if wo.wo_type else 'service' %}
+              {% set waiting = (wo.status.value == 'waiting_parts') %}
+
+              <tr class="{% if overdue %}fm-row-pending{% endif %}"
+                  data-no="{{ no|lower }}"
+                  data-status="{{ wo.status.value }}"
+                  data-prio="{{ priority }}"
+                  data-veh="{{ plate }}"
+                  data-cat="{{ category }}"
+                  data-vendor="{{ vendor|lower }}"
+                  data-upd="{{ updated }}"
+                  data-due="{{ due }}"
+              >
+                <td class="fm-mono fw-semibold">{{ no }}</td>
+                <td>{{ badge(wo.status.value) }}</td>
+                <td>{{ chip((priority|title) if priority else '—', pr_tone) }}</td>
+                <td class="fw-semibold">{{ plate }}</td>
+                <td>{{ chip(category|replace('_',' ')|title, 'info') }}</td>
+                <td>
+                  <div class="fw-semibold fm-clamp-2">{{ wo.title }}</div>
+                  <div class="fm-muted fm-clamp-2" style="font-size: var(--fm-muted-size);">{{ wo.description or '—' }}</div>
+                  {% if overdue %}<div class="mt-1">{{ chip('Overdue','danger') }}</div>{% endif %}
+                  {% if waiting %}<div class="mt-1">{{ chip('Waiting parts','warning') }}</div>{% endif %}
+                </td>
+                <td class="fm-muted">{{ vendor or '—' }}</td>
+                <td class="fm-money">—</td>
+                <td>{{ due or '—' }}</td>
+                <td>{{ updated or '—' }}</td>
+                <td class="fm-actions" onclick="event.stopPropagation();">
+                  <div class="btn-group btn-group-sm" role="group" aria-label="WO actions">
+                    <a class="btn btn-outline-secondary btn-icon" title="View/Edit" href="{{ url_for('maintenance.wo_detail', wo_id=wo.id) }}"><i class="bi bi-eye"></i></a>
+                    <button class="btn btn-outline-secondary btn-icon" type="button" disabled title="Close (Not implemented)"><i class="bi bi-check2-circle"></i></button>
+                    {% if current_user.role.value in ['super_admin','admin'] %}
+                      <button class="btn btn-outline-danger btn-icon" type="button" disabled title="Delete (Not implemented)"><i class="bi bi-trash"></i></button>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <script>
+        (function(){
+          const table = document.getElementById('woTable');
+          if(!table) return;
+          const tbody = table.querySelector('tbody');
+
+          const q = document.getElementById('woQ');
+          const st = document.getElementById('woStatus');
+          const pr = document.getElementById('woPriority');
+          const veh = document.getElementById('woVehicle');
+          const from = document.getElementById('woFrom');
+          const to = document.getElementById('woTo');
+
+          // vehicles from rows
+          const vehicles = new Set();
+          Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+            const v = (tr.dataset.veh || '').trim();
+            if(v) vehicles.add(v);
+          });
+          Array.from(vehicles).sort().forEach(v => { const o=document.createElement('option'); o.value=v; o.textContent=v; veh.appendChild(o); });
+
+          function inRange(d){
+            if(!d) return true;
+            if(from?.value && d < from.value) return false;
+            if(to?.value && d > to.value) return false;
+            return true;
+          }
+
+          function apply(){
+            const term = (q?.value || '').trim().toLowerCase();
+            const status = (st?.value || '').trim();
+            const prio = (pr?.value || '').trim();
+            const v = (veh?.value || '').trim();
+
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+              const no = tr.dataset.no || '';
+              const s = tr.dataset.status || '';
+              const p = tr.dataset.prio || '';
+              const vehicle = tr.dataset.veh || '';
+              const vendor = tr.dataset.vendor || '';
+              const upd = tr.dataset.upd || '';
+              const matchTerm = !term || no.includes(term) || vehicle.toLowerCase().includes(term) || vendor.includes(term) || (tr.innerText||'').toLowerCase().includes(term);
+              const matchStatus = !status || s === status;
+              const matchPrio = !prio || p === prio;
+              const matchVeh = !v || vehicle === v;
+              const matchDate = inRange(upd);
+              tr.style.display = (matchTerm && matchStatus && matchPrio && matchVeh && matchDate) ? '' : 'none';
+            });
+            kpis();
+          }
+
+          function kpis(){
+            const rows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.style.display !== 'none');
+            const open = rows.filter(r => (r.dataset.status||'')==='open').length;
+            const prog = rows.filter(r => (r.dataset.status||'')==='in_progress').length;
+            const over = 0; // due date not present in model yet
+            let closed30 = '—';
+
+            document.getElementById('kOpen').textContent = open;
+            document.getElementById('kProg').textContent = prog;
+            document.getElementById('kOver').textContent = over;
+            document.getElementById('kClosed').textContent = closed30;
+          }
+
+          q?.addEventListener('input', apply);
+          st?.addEventListener('change', apply);
+          pr?.addEventListener('change', apply);
+          veh?.addEventListener('change', apply);
+          from?.addEventListener('change', apply);
+          to?.addEventListener('change', apply);
+
+          // sorting
+          let sortKey=null, sortDir=1;
+          function getVal(tr,key){
+            const d = tr.dataset;
+            if(key==='no') return d.no||'';
+            if(key==='status') return d.status||'';
+            if(key==='prio') return d.prio||'';
+            if(key==='veh') return d.veh||'';
+            if(key==='cat') return d.cat||'';
+            if(key==='vendor') return d.vendor||'';
+            if(key==='cost') return '';
+            if(key==='due') return d.due||'9999-12-31';
+            if(key==='upd') return d.upd||'9999-12-31';
+            return '';
+          }
+          table.querySelectorAll('thead th[data-sort]').forEach(th => {
+            th.style.cursor='pointer';
+            th.addEventListener('click', () => {
+              const key = th.getAttribute('data-sort');
+              if(sortKey===key) sortDir=-sortDir; else { sortKey=key; sortDir=1; }
+              const rows = Array.from(tbody.querySelectorAll('tr'));
+              rows.sort((a,b)=> getVal(a,key).localeCompare(getVal(b,key))*sortDir);
+              rows.forEach(r=>tbody.appendChild(r));
+            });
+          });
+
+          kpis();
+        })();
+      </script>
+
+    {% else %}
+      {{ empty_state('bi-clipboard-check', 'No work orders yet', 'Create the first work order to track repairs and service.', 'New Work Order', url_for('maintenance.wo_create')) }}
+    {% endif %}
+
   </div>
 </div>
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>ID</th><th>Status</th><th>Vehicle</th><th>Title</th><th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for wo in work_orders %}
-      <tr>
-        <td>{{ wo.id }}</td>
-        <td>{{ wo.status.value }}</td>
-        <td>{{ wo.vehicle.plate_no }}</td>
-        <td>{{ wo.title }}</td>
-        <td><a class="btn btn-sm btn-outline-primary" href="{{ url_for('maintenance.wo_detail', wo_id=wo.id) }}">Open</a></td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
 {% endblock %}

@@ -1,0 +1,192 @@
+{
+  "audit_date": "2026-02-17",
+  "auditor": "OpenClaw AI Assistant",
+  "repository": "Fleet-Management",
+  "summary": {
+    "total_findings": 12,
+    "critical": 0,
+    "high": 3,
+    "moderate": 5,
+    "low": 4
+  },
+  "findings": [
+    {
+      "id": "PERF-001",
+      "severity": "high",
+      "category": "database.n_plus_one",
+      "title": "N+1 Queries in Vehicle List",
+      "impact": "100+ queries for 100 vehicles",
+      "evidence": "Vehicle.query.all() without selectinload",
+      "file": "app/blueprints/fleet/routes.py",
+      "line": 13,
+      "current_queries": "N+1 (where N = vehicle count)",
+      "optimized_queries": 2,
+      "fix": "Add selectinload(Vehicle.current_driver)",
+      "estimated_improvement": "95% query reduction"
+    },
+    {
+      "id": "PERF-002",
+      "severity": "high",
+      "category": "database.n_plus_one",
+      "title": "N+1 Queries in Driver List",
+      "impact": "Unnecessary queries on list view",
+      "evidence": "Driver.query.all() without optimization",
+      "file": "app/blueprints/drivers/routes.py",
+      "line": 13,
+      "current_queries": "N+1",
+      "optimized_queries": 1,
+      "fix": "Query is already simple, but add pagination",
+      "estimated_improvement": "Pagination prevents memory issues"
+    },
+    {
+      "id": "PERF-003",
+      "severity": "high",
+      "category": "database.missing_index",
+      "title": "Missing Index on Trip.created_at",
+      "impact": "Full table scan on date range queries",
+      "evidence": "created_at used in filters, not indexed",
+      "file": "app/models/trip.py",
+      "line": 52,
+      "table": "trips",
+      "column": "created_at",
+      "fix": "CREATE INDEX ix_trips_created_at ON trips(created_at)",
+      "estimated_improvement": "10-100x faster on large datasets"
+    },
+    {
+      "id": "PERF-004",
+      "severity": "moderate",
+      "category": "database.missing_index",
+      "title": "Missing Index on WorkOrder.opened_at",
+      "impact": "Slow work order reports",
+      "evidence": "opened_at used in date filters",
+      "file": "app/models/maintenance.py",
+      "line": 35,
+      "table": "work_orders",
+      "column": "opened_at",
+      "fix": "CREATE INDEX ix_work_orders_opened_at ON work_orders(opened_at)",
+      "estimated_improvement": "10-100x faster"
+    },
+    {
+      "id": "PERF-005",
+      "severity": "moderate",
+      "category": "database.missing_index",
+      "title": "Missing Index on FuelEntry.created_at",
+      "impact": "Slow fuel reports",
+      "evidence": "created_at used in date filters",
+      "file": "app/models/fuel_entry.py",
+      "line": 35,
+      "table": "fuel_entries",
+      "column": "created_at",
+      "fix": "CREATE INDEX ix_fuel_entries_created_at ON fuel_entries(created_at)",
+      "estimated_improvement": "10-100x faster"
+    },
+    {
+      "id": "PERF-006",
+      "severity": "moderate",
+      "category": "database.composite_index",
+      "title": "Missing Composite Index on Trip.status + created_at",
+      "impact": "Slow filtered list queries",
+      "evidence": "Common query pattern: filter by status, order by date",
+      "file": "app/models/trip.py",
+      "line": 45,
+      "table": "trips",
+      "columns": ["status", "created_at"],
+      "fix": "CREATE INDEX ix_trips_status_created ON trips(status, created_at)",
+      "estimated_improvement": "5-50x faster"
+    },
+    {
+      "id": "PERF-007",
+      "severity": "moderate",
+      "category": "pagination.missing",
+      "title": "No Pagination on Driver List",
+      "impact": "Memory issues with many drivers",
+      "evidence": "Driver.query.all() loads all records",
+      "file": "app/blueprints/drivers/routes.py",
+      "line": 13,
+      "fix": "Add paginate() like fuel_list has",
+      "estimated_improvement": "Constant memory usage"
+    },
+    {
+      "id": "PERF-008",
+      "severity": "moderate",
+      "category": "pagination.missing",
+      "title": "No Pagination on Vehicle List",
+      "impact": "Memory issues with many vehicles",
+      "evidence": "Vehicle.query.all() loads all records",
+      "file": "app/blueprints/fleet/routes.py",
+      "line": 13,
+      "fix": "Add paginate(page=page, per_page=25)",
+      "estimated_improvement": "Constant memory usage"
+    },
+    {
+      "id": "PERF-009",
+      "severity": "low",
+      "category": "query.eager_loading",
+      "title": "Missing Eager Loading in Dashboard",
+      "impact": "Multiple queries for related data",
+      "evidence": "Dashboard queries vehicles, then accesses related data",
+      "file": "app/blueprints/dashboard/routes.py",
+      "line": 40,
+      "fix": "Add selectinload to vehicle/driver queries",
+      "estimated_improvement": "30-50% faster dashboard load"
+    },
+    {
+      "id": "PERF-010",
+      "severity": "low",
+      "category": "calculation.inefficient",
+      "title": "Inefficient Loop for Missing Documents Calculation",
+      "impact": "O(N*M) complexity where N=vehicles, M=doc types",
+      "evidence": "Nested loop in dashboard/index()",
+      "file": "app/blueprints/dashboard/routes.py",
+      "line": 52,
+      "fix": "Use SQL query with LEFT JOIN and GROUP BY",
+      "estimated_improvement": "90% faster with many vehicles"
+    },
+    {
+      "id": "PERF-011",
+      "severity": "low",
+      "category": "memory.large_payload",
+      "title": "Loading All Records in Reports",
+      "impact": "Memory issues with large datasets",
+      "evidence": ".all() used in report queries",
+      "file": "app/blueprints/reports/routes.py",
+      "line": 80,
+      "fix": "Use yield_per() for streaming large result sets",
+      "estimated_improvement": "Constant memory for CSV/PDF generation"
+    },
+    {
+      "id": "PERF-012",
+      "severity": "low",
+      "category": "database.connection_pooling",
+      "title": "No Database Connection Pooling Configuration",
+      "impact": "Connection overhead on each request",
+      "evidence": "No SQLALCHEMY_ENGINE_OPTIONS configured",
+      "file": "app/config.py",
+      "line": 1,
+      "fix": "Add pool_size, pool_recycle, pool_pre_ping",
+      "estimated_improvement": "20-30% faster DB operations"
+    }
+  ],
+  "recommendations": {
+    "immediate": [
+      "Add selectinload to all list views (PERF-001, PERF-002)",
+      "Create missing indexes (PERF-003, PERF-004, PERF-005, PERF-006)",
+      "Add pagination to vehicle/driver lists (PERF-007, PERF-008)"
+    ],
+    "short_term": [
+      "Optimize dashboard queries (PERF-009, PERF-010)",
+      "Configure connection pooling (PERF-012)"
+    ],
+    "long_term": [
+      "Stream large report queries (PERF-011)",
+      "Add query performance monitoring"
+    ]
+  },
+  "migration_sql": "-- Run these migrations to add missing indexes\n\nCREATE INDEX IF NOT EXISTS ix_trips_created_at ON trips(created_at);\nCREATE INDEX IF NOT EXISTS ix_trips_time_out ON trips(time_out);\nCREATE INDEX IF NOT EXISTS ix_trips_status_created ON trips(status, created_at);\n\nCREATE INDEX IF NOT EXISTS ix_work_orders_opened_at ON work_orders(opened_at);\nCREATE INDEX IF NOT EXISTS ix_work_orders_status_vehicle ON work_orders(status, vehicle_id);\n\nCREATE INDEX IF NOT EXISTS ix_fuel_entries_created_at ON fuel_entries(created_at);\nCREATE INDEX IF NOT EXISTS ix_fuel_entries_status_date ON fuel_entries(status, fuel_date);\n\nCREATE INDEX IF NOT EXISTS ix_incidents_incident_dt ON incidents(incident_dt);\nCREATE INDEX IF NOT EXISTS ix_incidents_status ON incidents(status);\n\nCREATE INDEX IF NOT EXISTS ix_vehicle_documents_expiry ON vehicle_documents(expiry_date, status);\n",
+  "benchmark_targets": {
+    "vehicle_list_load_ms": "< 200ms with 1000 vehicles",
+    "dashboard_load_ms": "< 500ms with full data",
+    "trip_report_generation_ms": "< 2000ms for 10000 trips",
+    "database_query_count_per_page": "< 10 queries"
+  }
+}
