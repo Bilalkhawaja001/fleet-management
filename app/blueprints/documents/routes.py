@@ -265,11 +265,19 @@ def attachment_delete(id: int):
 
     try:
         path = _attachment_path_or_404(a)
+        file_cleanup_warning = False
         if path.exists():
-            path.unlink()
+            try:
+                path.unlink()
+            except PermissionError:
+                file_cleanup_warning = True
+                current_app.logger.exception("Document physical file could not be removed (locked)")
         db.session.delete(a)
         db.session.commit()
-        flash("Document deleted", "success")
+        if file_cleanup_warning:
+            flash("Document metadata deleted. Physical file was locked and could not be removed now.", "warning")
+        else:
+            flash("Document deleted", "success")
     except Exception:
         db.session.rollback()
         current_app.logger.exception("Document delete failed")

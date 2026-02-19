@@ -17,6 +17,12 @@ from .forms import DateRangeForm
 bp = Blueprint("reports", __name__, url_prefix="/reports")
 
 
+def _enum_value(value, default=""):
+    if value is None:
+        return default
+    return getattr(value, "value", value)
+
+
 def _validate_report_upload(file_storage):
     if not file_storage or not getattr(file_storage, "filename", None):
         return None, None
@@ -193,12 +199,12 @@ def trips_csv():
     trips = q.order_by(Trip.id.desc()).all()
     rows = []
     for t in trips:
-        route = " → ".join([p for p in [t.origin or "", t.destination_city or "", t.destination or ""] if p])
+        route = " -> ".join([p for p in [t.origin or "", t.destination_city or "", t.destination or ""] if p])
         rows.append(
             [
                 t.id,
                 t.status.value,
-                t.usage_type.value if t.usage_type else "",
+                _enum_value(t.usage_type, ""),
                 t.vehicle.plate_no if t.vehicle else "",
                 t.driver.name if t.driver else "",
                 t.time_out.strftime("%Y-%m-%d %H:%M") if t.time_out else "",
@@ -257,12 +263,12 @@ def trips_pdf():
     trips = q.order_by(Trip.id.desc()).all()
     rows = []
     for t in trips:
-        route = " → ".join([p for p in [t.origin or "", t.destination_city or "", t.destination or ""] if p])
+        route = " -> ".join([p for p in [t.origin or "", t.destination_city or "", t.destination or ""] if p])
         rows.append(
             [
                 t.id,
                 t.status.value,
-                t.usage_type.value if t.usage_type else "",
+                _enum_value(t.usage_type, ""),
                 t.vehicle.plate_no if t.vehicle else "",
                 t.driver.name if t.driver else "",
                 t.time_out.strftime("%Y-%m-%d %H:%M") if t.time_out else "",
@@ -442,7 +448,7 @@ def work_orders_csv():
             [
                 wo.id,
                 wo.status.value,
-                wo.vehicle.plate_no,
+                wo.vehicle.plate_no if wo.vehicle else "",
                 wo.title,
                 wo.opened_at.strftime("%Y-%m-%d") if wo.opened_at else "",
             ]
@@ -473,7 +479,7 @@ def work_orders_pdf():
             [
                 wo.id,
                 wo.status.value,
-                wo.vehicle.plate_no,
+                wo.vehicle.plate_no if wo.vehicle else "",
                 wo.title,
             ]
         )
@@ -501,7 +507,7 @@ def preventive_schedules_csv():
         rows.append(
             [
                 s.id,
-                s.vehicle.plate_no,
+                s.vehicle.plate_no if s.vehicle else "",
                 s.title,
                 s.interval_km or "",
                 s.interval_days or "",
@@ -529,7 +535,7 @@ def preventive_schedules_pdf():
         rows.append(
             [
                 s.id,
-                s.vehicle.plate_no,
+                s.vehicle.plate_no if s.vehicle else "",
                 s.title,
                 s.interval_km or "",
                 s.interval_days or "",
