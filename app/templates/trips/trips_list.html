@@ -41,8 +41,8 @@
   <div class="card-body p-0">
 
     {% if trips and trips|length %}
-      <div class="table-responsive">
-        <table id="tripsTable" class="table table-hover mb-0">
+      <div id="tripsTableWrap" class="trips-table-wrap">
+        <table id="tripsTable" class="table table-hover mb-0 trips-table">
           <thead>
             <tr>
               <th data-sort="id" style="width:120px;">Trip No</th>
@@ -102,7 +102,7 @@
                 <td class="fm-actions" onclick="event.stopPropagation();">
                   <div class="btn-group btn-group-sm" role="group" aria-label="Trip actions">
                     <button
-                      class="btn btn-primary btn-icon js-end-trip"
+                      class="btn btn-primary js-end-trip d-inline-flex align-items-center gap-1 px-3"
                       title="End Trip"
                       type="button"
                       data-bs-toggle="modal"
@@ -112,7 +112,8 @@
                       data-has-returnable="{{ 1 if returnable_count > 0 else 0 }}"
                       {% if not can_end %}disabled{% endif %}
                     >
-                      End Trip
+                      <i class="bi bi-flag-fill"></i>
+                      <span>End Trip</span>
                     </button>
                     <a class="btn btn-outline-secondary btn-icon" title="View" href="{{ url_for('trips.trip_edit', trip_id=t.id) }}"><i class="bi bi-eye"></i></a>
                     <a class="btn btn-outline-secondary btn-icon" title="Expenses" href="{{ url_for('trips.trip_expenses', trip_id=t.id) }}"><i class="bi bi-receipt"></i></a>
